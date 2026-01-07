@@ -1,0 +1,194 @@
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Background */
+.login-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+}
+
+.login-bg-pattern {
+    width: 100%;
+    height: 100%;
+    background:
+        radial-gradient(circle at 20% 80%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(37, 99, 235, 0.1) 0%, transparent 50%),
+        var(--bg-primary);
+}
+
+/* Card */
+.login-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-2xl);
+    padding: var(--space-10) var(--space-8);
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn var(--transition-slow);
+}
+
+@media (max-width: 480px) {
+    .login-card {
+        padding: var(--space-8) var(--space-6);
+    }
+}
+
+/* Logo */
+.login-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-8);
+}
+
+.login-logo-icon {
+    width: 56px;
+    height: 56px;
+    color: var(--primary);
+    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: var(--radius-xl);
+    padding: var(--space-3);
+}
+
+.login-logo-icon svg {
+    width: 100%;
+    height: 100%;
+    stroke: white;
+}
+
+.login-brand {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-bold);
+    color: var(--text-primary);
+}
+
+/* Welcome */
+.login-welcome {
+    text-align: center;
+    margin-bottom: var(--space-8);
+}
+
+.login-welcome h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--space-2);
+}
+
+.login-welcome p {
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+/* Google Button */
+.google-btn {
+    width: 100%;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-base);
+    font-weight: var(--font-medium);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-bottom: var(--space-6);
+}
+
+.google-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--text-tertiary);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.google-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.google-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.google-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border-primary);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+/* Terms */
+.login-terms {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: var(--space-8);
+}
+
+.login-terms a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.login-terms a:hover {
+    text-decoration: underline;
+}
+
+/* Trust Badges */
+.login-trust {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-6);
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--border-secondary);
+}
+
+.trust-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.trust-item svg {
+    width: 24px;
+    height: 24px;
+    color: var(--success);
+}
+
+.trust-item span {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+    .login-trust {
+        gap: var(--space-4);
+    }
+
+    .trust-item span {
+        font-size: 10px;
+    }
+}
