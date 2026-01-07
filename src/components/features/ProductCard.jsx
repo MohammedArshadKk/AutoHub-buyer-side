@@ -3,14 +3,28 @@ import { Heart, Check } from 'lucide-react';
 import { ConditionBadge } from '../common/Badge';
 import Button from '../common/Button';
 import useCartStore from '../../store/cartStore';
+import useRequireAuth from '../../hooks/useRequireAuth';
 import './ProductCard.css';
 
 function ProductCard({ product, variant = 'default' }) {
     const addItem = useCartStore((state) => state.addItem);
+    const requireAuth = useRequireAuth();
 
     const handleAddToCart = (e) => {
         e.preventDefault();
-        addItem(product);
+        // Require authentication before adding to cart
+        requireAuth(() => {
+            addItem(product);
+        });
+    };
+
+    const handleWishlist = (e) => {
+        e.preventDefault();
+        // Require authentication for wishlist
+        requireAuth(() => {
+            // TODO: Add to wishlist functionality
+            console.log('Added to wishlist:', product.id);
+        });
     };
 
     const isCompact = variant === 'compact';
@@ -32,7 +46,11 @@ function ProductCard({ product, variant = 'default' }) {
                 </div>
 
                 {/* Wishlist Button */}
-                <button className="product-wishlist" aria-label="Add to wishlist">
+                <button
+                    className="product-wishlist"
+                    aria-label="Add to wishlist"
+                    onClick={handleWishlist}
+                >
                     <Heart size={18} />
                 </button>
             </div>

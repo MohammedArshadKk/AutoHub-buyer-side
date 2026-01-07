@@ -92,6 +92,30 @@
     line-height: 1.6;
 }
 
+/* Error Message */
+.login-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--space-4);
+}
+
+.login-error svg {
+    width: 18px;
+    height: 18px;
+    color: var(--error);
+    flex-shrink: 0;
+}
+
+.login-error span {
+    font-size: var(--text-sm);
+    color: var(--error);
+}
+
 /* Google Button */
 .google-btn {
     width: 100%;

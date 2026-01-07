@@ -1,29 +1,79 @@
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useGoogleLogin } from '@react-oauth/google';
 import useAuthStore from '../store/authStore';
 import './LoginPage.css';
 
 function LoginPage() {
     const navigate = useNavigate();
-    const { login, isLoading, setLoading } = useAuthStore();
+    const [searchParams] = useSearchParams();
+    const { user, isLoading, setLoading, login } = useAuthStore();
+    const [error, setError] = useState(null);
 
-    const handleGoogleLogin = async () => {
-        setLoading(true);
-
-        // Simulate Google OAuth login
-        // In production, this would integrate with Firebase Auth or Google OAuth
-        setTimeout(() => {
-            // Mock user data - replace with actual Google Auth response
-            const mockUser = {
-                uid: 'google-user-123',
-                displayName: 'John Doe',
-                email: 'john.doe@gmail.com',
-                photoURL: 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
-            };
-
-            login(mockUser);
+    // Redirect if already logged in
+    useEffect(() => {
+        if (user) {
             navigate('/');
-        }, 1500);
+        }
+    }, [user, navigate]);
+
+    // Check for error in URL params (from OAuth callback)
+    useEffect(() => {
+        const errorParam = searchParams.get('error');
+        if (errorParam) {
+            setError(getErrorMessage(errorParam));
+        }
+    }, [searchParams]);
+
+    const getErrorMessage = (errorType) => {
+        switch (errorType) {
+            case 'auth_failed':
+                return 'Authentication failed. Please try again.';
+            case 'no_email':
+                return 'Email access is required to sign in.';
+            case 'server_error':
+                return 'Server error. Please try again later.';
+            default:
+                return 'An error occurred. Please try again.';
+        }
     };
+
+    const handleGoogleSuccess = async (tokenResponse) => {
+        try {
+            setLoading(true);
+            // Fetch user info from Google using access token
+            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+            });
+            const userInfo = await userInfoResponse.json();
+
+            // Set user in store (using login function)
+            login({
+                id: userInfo.sub,
+                displayName: userInfo.name,
+                email: userInfo.email,
+                photoURL: userInfo.picture,
+                accessToken: tokenResponse.access_token,
+            });
+
+            navigate('/');
+        } catch (err) {
+            console.error('Google login error:', err);
+            setError('Failed to get user info. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleError = () => {
+        setError('Google sign-in was cancelled or failed. Please try again.');
+        setLoading(false);
+    };
+
+    const googleLogin = useGoogleLogin({
+        onSuccess: handleGoogleSuccess,
+        onError: handleGoogleError,
+    });
 
     return (
         <div className="login-page">
@@ -52,10 +102,21 @@ function LoginPage() {
                     <p>Sign in to access your account, track orders, and find the perfect parts for your vehicle.</p>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                    <div className="login-error">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 8v4M12 16h.01" />
+                        </svg>
+                        <span>{error}</span>
+                    </div>
+                )}
+
                 {/* Google Sign In Button */}
                 <button
                     className="google-btn"
-                    onClick={handleGoogleLogin}
+                    onClick={() => googleLogin()}
                     disabled={isLoading}
                 >
                     {isLoading ? (
