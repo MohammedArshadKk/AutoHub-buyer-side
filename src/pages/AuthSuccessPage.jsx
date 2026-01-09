@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
+import useCartStore from '../store/cartStore';
+import guestStorageService from '../services/guestStorageService';
 import './AuthSuccessPage.css';
 
 function AuthSuccessPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { checkAuth, executePendingAction } = useAuthStore();
-    const [status, setStatus] = useState('loading'); // loading, success, error
+    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
+    const [status, setStatus] = useState('loading'); // loading, success, syncing, error
     const [message, setMessage] = useState('Completing sign in...');
 
     useEffect(() => {
@@ -26,6 +29,20 @@ function AuthSuccessPage() {
                 const isAuthenticated = await checkAuth();
 
                 if (isAuthenticated) {
+                    // Check if there's guest data to sync
+                    const guestData = guestStorageService.getGuestDataSummary();
+
+                    if (guestData.hasData) {
+                        setStatus('syncing');
+                        setMessage(`Syncing your ${guestData.cartCount} cart item${guestData.cartCount !== 1 ? 's' : ''}...`);
+
+                        // Sync guest cart to authenticated cart
+                        syncFromGuestStorage();
+
+                        // Small delay to show sync message
+                        await new Promise(resolve => setTimeout(resolve, 800));
+                    }
+
                     setStatus('success');
                     setMessage('Sign in successful! Redirecting...');
 
@@ -52,7 +69,7 @@ function AuthSuccessPage() {
         };
 
         handleAuthCallback();
-    }, [checkAuth, executePendingAction, navigate, searchParams]);
+    }, [checkAuth, executePendingAction, navigate, searchParams, syncFromGuestStorage]);
 
     const getErrorMessage = (error) => {
         switch (error) {
@@ -72,6 +89,16 @@ function AuthSuccessPage() {
             <div className="auth-success-card">
                 {status === 'loading' && (
                     <div className="auth-spinner" />
+                )}
+                {status === 'syncing' && (
+                    <>
+                        <div className="auth-sync-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 12a9 9 0 11-9-9" />
+                                <path d="M21 3v9h-9" />
+                            </svg>
+                        </div>
+                    </>
                 )}
                 {status === 'success' && (
                     <div className="auth-success-icon">

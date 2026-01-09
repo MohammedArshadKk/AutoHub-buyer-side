@@ -9,10 +9,20 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import AuthSuccessPage from './pages/AuthSuccessPage';
 import ProductsPage from './pages/ProductsPage';
+import ProductDetailPage from './pages/ProductDetailPage';
+import CartPage from './pages/CartPage';
 import './index.css';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
+/**
+ * Auto Hub Buyer Side Application
+ * 
+ * Authentication Flow:
+ * - Uses client-side Google OAuth via @react-oauth/google
+ * - Guest users can browse and add to cart
+ * - Cart syncs to account on login
+ */
 function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -36,6 +46,8 @@ function App() {
                           <Route path="/" element={<HomePage />} />
                           <Route path="/products" element={<ProductsPage />} />
                           <Route path="/products/:category" element={<ProductsPage />} />
+                          <Route path="/product/:id" element={<ProductDetailPage />} />
+                          <Route path="/cart" element={<CartPage />} />
                         </Routes>
                       </main>
                       <Footer />

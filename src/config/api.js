@@ -11,6 +11,39 @@ export const AUTH_ENDPOINTS = {
     logoutAll: `${API_BASE_URL}/auth/logout-all`,
 };
 
+// Cart endpoints (for authenticated users - when backend is ready)
+export const CART_ENDPOINTS = {
+    get: `${API_BASE_URL}/cart`,
+    add: `${API_BASE_URL}/cart/add`,
+    update: `${API_BASE_URL}/cart/update`,
+    remove: `${API_BASE_URL}/cart/remove`,
+    sync: `${API_BASE_URL}/cart/sync`,
+    clear: `${API_BASE_URL}/cart/clear`,
+};
+
+// Wishlist endpoints (for authenticated users - when backend is ready)
+export const WISHLIST_ENDPOINTS = {
+    get: `${API_BASE_URL}/wishlist`,
+    add: `${API_BASE_URL}/wishlist/add`,
+    remove: `${API_BASE_URL}/wishlist/remove`,
+    sync: `${API_BASE_URL}/wishlist/sync`,
+};
+
+// Product endpoints
+export const PRODUCT_ENDPOINTS = {
+    list: `${API_BASE_URL}/products`,
+    detail: (id) => `${API_BASE_URL}/products/${id}`,
+    trending: `${API_BASE_URL}/products/trending`,
+    categories: `${API_BASE_URL}/categories`,
+};
+
+// Vehicle endpoints
+export const VEHICLE_ENDPOINTS = {
+    makes: `${API_BASE_URL}/vehicles/makes`,
+    models: `${API_BASE_URL}/vehicles/models`,
+    years: `${API_BASE_URL}/vehicles/years`,
+};
+
 // Fetch wrapper with credentials (for cookies)
 export const fetchWithCredentials = async (url, options = {}) => {
     const response = await fetch(url, {

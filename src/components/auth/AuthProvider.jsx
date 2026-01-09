@@ -1,39 +1,44 @@
 import { useEffect, useRef } from 'react';
 import useAuthStore from '../../store/authStore';
+import useCartStore from '../../store/cartStore';
 
 /**
  * AuthProvider Component
- * Handles initial authentication check and token refresh
- * Wrap your app with this component to enable auth features
+ * Handles initial authentication check for client-side OAuth.
+ * Uses persisted user from localStorage (via Zustand).
+ * Wrap your app with this component to enable auth features.
  */
 function AuthProvider({ children }) {
-    const { checkAuth, refreshToken, isInitialized, user } = useAuthStore();
-    const refreshIntervalRef = useRef(null);
+    const { user, isInitialized, setInitialized } = useAuthStore();
+    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
+    const prevUserRef = useRef(null);
+    const hasInitialized = useRef(false);
 
-    // Check auth status on mount
+    // Initialize auth state on mount
+    // For client-side OAuth, we rely on persisted user from localStorage
     useEffect(() => {
-        checkAuth();
-    }, [checkAuth]);
+        if (!hasInitialized.current) {
+            hasInitialized.current = true;
+            // Mark as initialized - user is already loaded from localStorage by Zustand persist
+            setInitialized(true);
+        }
+    }, [setInitialized]);
 
-    // Set up token refresh interval (every 10 minutes)
+    // Handle user login/logout transitions
     useEffect(() => {
-        if (user && !refreshIntervalRef.current) {
-            // Refresh token every 10 minutes (before 15 min expiry)
-            refreshIntervalRef.current = setInterval(() => {
-                refreshToken();
-            }, 10 * 60 * 1000);
+        const prevUser = prevUserRef.current;
+
+        // User just logged in (was null, now has user)
+        if (!prevUser && user) {
+            // Sync guest cart when user logs in
+            syncFromGuestStorage();
         }
 
-        return () => {
-            if (refreshIntervalRef.current) {
-                clearInterval(refreshIntervalRef.current);
-                refreshIntervalRef.current = null;
-            }
-        };
-    }, [user, refreshToken]);
+        // Update ref for next comparison
+        prevUserRef.current = user;
+    }, [user, syncFromGuestStorage]);
 
-    // Show nothing while checking initial auth status
-    // You could show a loading spinner here if preferred
+    // Show loading while initializing
     if (!isInitialized) {
         return (
             <div className="auth-provider-loading">

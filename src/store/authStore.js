@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import authService from '../services/authService';
+import useCartStore from './cartStore';
 
+/**
+ * Auth Store
+ * Manages authentication state with cookie-based tokens.
+ * Handles guest data sync on login.
+ */
 const useAuthStore = create(
     persist(
         (set, get) => ({
@@ -12,19 +18,38 @@ const useAuthStore = create(
             showLoginModal: false,
             pendingAction: null, // Callback to execute after login
 
-            // Actions
+            // ============ AUTH ACTIONS ============
+
+            /**
+             * Set user data on login
+             */
             login: (userData) => set({
                 user: userData,
                 isLoading: false,
                 error: null
             }),
 
-            logout: async () => {
+            /**
+             * Logout from current device
+             * Optionally preserves cart for guest access
+             */
+            logout: async (preserveCart = false) => {
                 try {
+                    // Save cart to guest storage before logout if requested
+                    if (preserveCart) {
+                        useCartStore.getState().saveToGuestStorage();
+                    }
+
                     await authService.logout();
                 } catch (error) {
                     console.error('Logout error:', error);
                 }
+
+                // Clear cart on logout
+                if (!preserveCart) {
+                    useCartStore.getState().clearCart();
+                }
+
                 set({
                     user: null,
                     isLoading: false,
@@ -32,12 +57,19 @@ const useAuthStore = create(
                 });
             },
 
+            /**
+             * Logout from all devices
+             */
             logoutAll: async () => {
                 try {
                     await authService.logoutAll();
                 } catch (error) {
                     console.error('Logout all error:', error);
                 }
+
+                // Clear cart on logout
+                useCartStore.getState().clearCart();
+
                 set({
                     user: null,
                     isLoading: false,
@@ -51,7 +83,12 @@ const useAuthStore = create(
 
             setInitialized: (initialized) => set({ isInitialized: initialized }),
 
-            // Check auth status from server
+            // ============ AUTH CHECK ============
+
+            /**
+             * Check auth status from server using cookies
+             * Also syncs guest cart if user is authenticated
+             */
             checkAuth: async () => {
                 try {
                     set({ isLoading: true });
@@ -70,6 +107,10 @@ const useAuthStore = create(
                             isInitialized: true,
                             error: null
                         });
+
+                        // Sync guest cart after successful auth
+                        useCartStore.getState().syncFromGuestStorage();
+
                         return true;
                     } else {
                         set({
@@ -92,7 +133,11 @@ const useAuthStore = create(
                 }
             },
 
-            // Fetch full user profile
+            // ============ USER PROFILE ============
+
+            /**
+             * Fetch full user profile from server
+             */
             fetchUserProfile: async () => {
                 try {
                     const user = await authService.getCurrentUser();
@@ -116,36 +161,60 @@ const useAuthStore = create(
                 }
             },
 
-            // Refresh token
+            /**
+             * Refresh access token
+             */
             refreshToken: async () => {
                 return await authService.refreshToken();
             },
 
-            // Login modal controls
+            // ============ LOGIN MODAL ============
+
+            /**
+             * Open login modal with optional pending action
+             * @param {Function} pendingAction - Callback to execute after login
+             */
             openLoginModal: (pendingAction = null) => set({
                 showLoginModal: true,
                 pendingAction
             }),
 
+            /**
+             * Close login modal
+             */
             closeLoginModal: () => set({
                 showLoginModal: false,
                 pendingAction: null
             }),
 
-            // Execute pending action after successful login
+            /**
+             * Execute pending action after successful login
+             * Also syncs guest cart
+             */
             executePendingAction: () => {
                 const { pendingAction } = get();
+
+                // Sync guest cart first
+                useCartStore.getState().syncFromGuestStorage();
+
+                // Execute pending action if exists
                 if (pendingAction && typeof pendingAction === 'function') {
                     pendingAction();
                 }
+
                 set({ pendingAction: null, showLoginModal: false });
             },
 
-            // Getters
+            // ============ GETTERS ============
+
+            /**
+             * Check if user is authenticated
+             */
             isAuthenticated: () => get().user !== null,
         }),
         {
             name: 'autohub-auth',
+            // Only persist user data, not UI states
             partialize: (state) => ({ user: state.user }),
         }
     )

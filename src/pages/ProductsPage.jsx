@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
     ChevronRight,
@@ -7,109 +7,16 @@ import {
     SlidersHorizontal,
     X,
     Check,
-    ChevronDown,
-    HelpCircle
+    HelpCircle,
+    AlertCircle,
+    Loader2
 } from 'lucide-react';
 import VehicleSelector from '../components/features/VehicleSelector';
 import ProductCard from '../components/features/ProductCard';
 import Button from '../components/common/Button';
 import Select from '../components/common/Select';
+import useProductStore from '../store/productStore';
 import './ProductsPage.css';
-
-// Mock products data
-const MOCK_PRODUCTS = [
-    {
-        id: '1',
-        name: 'Bosch High Output Alternator - 150 Amp',
-        sku: 'GL-8756-A',
-        price: 145.00,
-        shipping: 'free',
-        condition: 'grade-a-tested',
-        fitVehicle: '2018 F-150',
-        shippingMethod: 'Free Shipping',
-        image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400&h=300&fit=crop',
-    },
-    {
-        id: '2',
-        name: 'Motorcraft Generic Alternator Assembly',
-        sku: 'FL3Z-10346-A',
-        price: 112.50,
-        shipping: 'free',
-        condition: 'refurbished',
-        fitVehicle: '2018 F-150',
-        shippingMethod: 'Standard Ship',
-        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
-    },
-    {
-        id: '3',
-        name: 'Denso Remanufactured Alternator',
-        sku: 'Z10-9870',
-        price: 89.99,
-        shipping: 15.00,
-        condition: 'grade-b',
-        fitVehicle: '2018 F-150',
-        shippingMethod: '+ Shipping',
-        image: 'https://images.unsplash.com/photo-1489824904134-891ab64532f1?w=400&h=300&fit=crop',
-    },
-    {
-        id: '4',
-        name: 'ACDelco Gold Professional Alternator',
-        sku: '335-1245',
-        price: 135.00,
-        shipping: 'free',
-        condition: 'grade-a-tested',
-        shippingMethod: 'Free Shipping',
-        image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&h=300&fit=crop',
-    },
-    {
-        id: '5',
-        name: 'Valeo Alternator (Original Equipment)',
-        sku: '439872',
-        price: 195.99,
-        condition: 'grade-a',
-        fitVehicle: '2018 F-150',
-        shippingMethod: 'Expedited',
-        image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=400&h=300&fit=crop',
-    },
-    {
-        id: '6',
-        name: 'BBB Industries Alternator 160A',
-        sku: 'N-11234',
-        price: 105.00,
-        shipping: 'free',
-        condition: 'refurbished',
-        fitVehicle: '2018 F-150',
-        shippingMethod: 'Free Shipping',
-        image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400&h=300&fit=crop',
-    },
-    {
-        id: '7',
-        name: 'Pure Energy Alternator',
-        sku: '13769A',
-        price: 122.95,
-        condition: 'grade-a-tested',
-        fitVehicle: '2018 F-150',
-        shippingMethod: 'Free Shipping',
-        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
-    },
-    {
-        id: '8',
-        name: 'Budget OEM Ford Alternator',
-        sku: 'GL-8756-B',
-        price: 65.00,
-        condition: 'grade-c',
-        fitVehicle: '2018 F-150',
-        shippingMethod: 'Calc at Checkout',
-        image: 'https://images.unsplash.com/photo-1489824904134-891ab64532f1?w=400&h=300&fit=crop',
-    },
-];
-
-const CATEGORIES = [
-    { name: 'Alternators', count: 124 },
-    { name: 'Starters', count: 88 },
-    { name: 'Batteries & Access.', count: 42 },
-    { name: 'Belts & Hoses', count: 150 },
-];
 
 const CONDITIONS = [
     { value: 'grade-a', label: 'Grade A (Like New)' },
@@ -118,38 +25,185 @@ const CONDITIONS = [
 ];
 
 function ProductsPage() {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [viewMode, setViewMode] = useState('grid');
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [selectedConditions, setSelectedConditions] = useState(['grade-a']);
-    const [priceRange, setPriceRange] = useState({ min: 50, max: 500 });
-    const [sortBy, setSortBy] = useState('relevance');
-    const [activeFilters, setActiveFilters] = useState([
-        { key: 'vehicle', label: '2018 Ford F-150' },
-        { key: 'condition', label: 'Grade A' },
-    ]);
 
-    const category = searchParams.get('category') || 'alternators';
-    const year = searchParams.get('year') || '2018';
-    const make = searchParams.get('make') || 'Ford';
-    const model = searchParams.get('model') || 'F-150';
+    // Get state from product store
+    const {
+        products,
+        isLoading,
+        error,
+        pagination,
+        filters,
+        categories,
+        fetchProducts,
+        fetchCategories,
+        setFilter,
+        setFilters,
+        clearFilters,
+        goToPage,
+        nextPage,
+        prevPage,
+    } = useProductStore();
 
+    // Local filter state for controlled inputs
+    const [localFilters, setLocalFilters] = useState({
+        minPrice: filters.minPrice || '',
+        maxPrice: filters.maxPrice || '',
+        condition: filters.condition ? filters.condition.split(',') : [],
+    });
+
+    // Sync URL params to filters on mount
+    useEffect(() => {
+        const category = searchParams.get('category') || '';
+        const make = searchParams.get('make') || '';
+        const model = searchParams.get('model') || '';
+        const year = searchParams.get('year') || '';
+        const search = searchParams.get('search') || '';
+
+        // Set initial filters from URL
+        const initialFilters = {};
+        if (category) initialFilters.category = category;
+        if (make) initialFilters.make = make;
+        if (model) initialFilters.model = model;
+        if (year) initialFilters.year = year;
+        if (search) initialFilters.search = search;
+
+        if (Object.keys(initialFilters).length > 0) {
+            setFilters(initialFilters);
+        } else {
+            fetchProducts();
+        }
+
+        // Fetch categories
+        fetchCategories();
+    }, []); // Only run on mount
+
+    // Handle condition toggle
     const toggleCondition = (condition) => {
-        setSelectedConditions(prev =>
-            prev.includes(condition)
-                ? prev.filter(c => c !== condition)
-                : [...prev, condition]
+        setLocalFilters(prev => {
+            const newConditions = prev.condition.includes(condition)
+                ? prev.condition.filter(c => c !== condition)
+                : [...prev.condition, condition];
+            return { ...prev, condition: newConditions };
+        });
+    };
+
+    // Apply price and condition filters
+    const applyFilters = () => {
+        setFilters({
+            minPrice: localFilters.minPrice,
+            maxPrice: localFilters.maxPrice,
+            condition: localFilters.condition.join(','),
+        });
+    };
+
+    // Handle sort change
+    const handleSortChange = (value) => {
+        let sortValue = '-createdAt';
+        switch (value) {
+            case 'price-low':
+                sortValue = 'price';
+                break;
+            case 'price-high':
+                sortValue = '-price';
+                break;
+            case 'newest':
+                sortValue = '-createdAt';
+                break;
+            default:
+                sortValue = '-createdAt';
+        }
+        setFilter('sort', sortValue);
+        fetchProducts();
+    };
+
+    // Handle category click
+    const handleCategoryClick = (categorySlug) => {
+        setFilter('category', categorySlug);
+        fetchProducts();
+    };
+
+    // Handle clear all filters
+    const handleClearFilters = () => {
+        setLocalFilters({ minPrice: '', maxPrice: '', condition: [] });
+        clearFilters();
+    };
+
+    // Get active filters for display
+    const getActiveFilters = () => {
+        const active = [];
+        if (filters.make) active.push({ key: 'vehicle', label: `${filters.year || ''} ${filters.make} ${filters.model || ''}`.trim() });
+        if (filters.category) active.push({ key: 'category', label: filters.category });
+        if (filters.condition) active.push({ key: 'condition', label: filters.condition });
+        return active;
+    };
+
+    const activeFilters = getActiveFilters();
+
+    // Render pagination
+    const renderPagination = () => {
+        const { page, pages, hasNext, hasPrev } = pagination;
+        const pageNumbers = [];
+
+        // Show max 5 page numbers
+        let startPage = Math.max(1, page - 2);
+        let endPage = Math.min(pages, startPage + 4);
+        if (endPage - startPage < 4) {
+            startPage = Math.max(1, endPage - 4);
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            pageNumbers.push(i);
+        }
+
+        return (
+            <div className="pagination">
+                <button
+                    className="pagination-btn prev"
+                    disabled={!hasPrev || isLoading}
+                    onClick={prevPage}
+                >
+                    <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
+                    Previous
+                </button>
+
+                <div className="pagination-pages">
+                    {startPage > 1 && (
+                        <>
+                            <button className="page" onClick={() => goToPage(1)}>1</button>
+                            {startPage > 2 && <span className="page-ellipsis">...</span>}
+                        </>
+                    )}
+                    {pageNumbers.map(num => (
+                        <button
+                            key={num}
+                            className={`page ${num === page ? 'active' : ''}`}
+                            onClick={() => goToPage(num)}
+                            disabled={isLoading}
+                        >
+                            {num}
+                        </button>
+                    ))}
+                    {endPage < pages && (
+                        <>
+                            {endPage < pages - 1 && <span className="page-ellipsis">...</span>}
+                            <button className="page" onClick={() => goToPage(pages)}>{pages}</button>
+                        </>
+                    )}
+                </div>
+
+                <button
+                    className="pagination-btn next"
+                    disabled={!hasNext || isLoading}
+                    onClick={nextPage}
+                >
+                    Next
+                    <ChevronRight size={16} />
+                </button>
+            </div>
         );
-    };
-
-    const removeFilter = (key) => {
-        setActiveFilters(prev => prev.filter(f => f.key !== key));
-    };
-
-    const clearAllFilters = () => {
-        setActiveFilters([]);
-        setSelectedConditions([]);
-        setPriceRange({ min: 0, max: 1000 });
     };
 
     return (
@@ -168,7 +222,7 @@ function ProductsPage() {
                 <div className="sidebar-header">
                     <h3>
                         <SlidersHorizontal size={18} />
-                        Vehicle Selector
+                        Filters
                     </h3>
                     <button
                         className="sidebar-close"
@@ -180,7 +234,7 @@ function ProductsPage() {
 
                 {/* Vehicle Selector */}
                 <VehicleSelector />
-                <Button fullWidth className="update-vehicle-btn">
+                <Button fullWidth className="update-vehicle-btn" onClick={() => fetchProducts()}>
                     Update Vehicle
                 </Button>
 
@@ -188,14 +242,21 @@ function ProductsPage() {
                 <div className="filter-section">
                     <h4 className="filter-title">PART CATEGORIES</h4>
                     <ul className="category-list">
-                        {CATEGORIES.map((cat) => (
-                            <li key={cat.name}>
-                                <button className={cat.name.toLowerCase() === category ? 'active' : ''}>
-                                    {cat.name}
-                                    <span>{cat.count}</span>
-                                </button>
-                            </li>
-                        ))}
+                        {categories.length > 0 ? (
+                            categories.map((cat) => (
+                                <li key={cat.slug || cat.name}>
+                                    <button
+                                        className={filters.category === cat.slug ? 'active' : ''}
+                                        onClick={() => handleCategoryClick(cat.slug)}
+                                    >
+                                        {cat.name}
+                                        <span>{cat.count || 0}</span>
+                                    </button>
+                                </li>
+                            ))
+                        ) : (
+                            <li className="category-loading">Loading categories...</li>
+                        )}
                     </ul>
                 </div>
 
@@ -207,7 +268,7 @@ function ProductsPage() {
                             <label key={condition.value} className="condition-item">
                                 <input
                                     type="checkbox"
-                                    checked={selectedConditions.includes(condition.value)}
+                                    checked={localFilters.condition.includes(condition.value)}
                                     onChange={() => toggleCondition(condition.value)}
                                 />
                                 <span className="checkbox-custom">
@@ -227,8 +288,9 @@ function ProductsPage() {
                             <span>$</span>
                             <input
                                 type="number"
-                                value={priceRange.min}
-                                onChange={(e) => setPriceRange(prev => ({ ...prev, min: Number(e.target.value) }))}
+                                placeholder="Min"
+                                value={localFilters.minPrice}
+                                onChange={(e) => setLocalFilters(prev => ({ ...prev, minPrice: e.target.value }))}
                             />
                         </div>
                         <span className="price-separator">–</span>
@@ -236,19 +298,21 @@ function ProductsPage() {
                             <span>$</span>
                             <input
                                 type="number"
-                                value={priceRange.max}
-                                onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) }))}
+                                placeholder="Max"
+                                value={localFilters.maxPrice}
+                                onChange={(e) => setLocalFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
                             />
                         </div>
                     </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1000"
-                        value={priceRange.max}
-                        onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) }))}
-                        className="price-slider"
-                    />
+                    <Button
+                        fullWidth
+                        variant="outline"
+                        size="sm"
+                        onClick={applyFilters}
+                        className="apply-filters-btn"
+                    >
+                        Apply Filters
+                    </Button>
                 </div>
             </aside>
 
@@ -266,26 +330,39 @@ function ProductsPage() {
                 <nav className="breadcrumbs">
                     <Link to="/">Home</Link>
                     <ChevronRight size={14} />
-                    <Link to={`/products?make=${make}`}>{make}</Link>
-                    <ChevronRight size={14} />
-                    <Link to={`/products?make=${make}&model=${model}`}>{model}</Link>
-                    <ChevronRight size={14} />
-                    <span>Alternators</span>
+                    <Link to="/products">Products</Link>
+                    {filters.category && (
+                        <>
+                            <ChevronRight size={14} />
+                            <span>{filters.category}</span>
+                        </>
+                    )}
                 </nav>
 
                 {/* Header */}
                 <div className="products-header">
                     <div className="products-title-section">
-                        <h1>Alternators for {year} {make} {model}</h1>
-                        <p>Showing {MOCK_PRODUCTS.length} verified parts compatible with your vehicle</p>
+                        <h1>
+                            {filters.category
+                                ? `${filters.category.charAt(0).toUpperCase() + filters.category.slice(1)}`
+                                : 'All Products'
+                            }
+                            {filters.make && ` for ${filters.year || ''} ${filters.make} ${filters.model || ''}`.trim()}
+                        </h1>
+                        <p>
+                            {isLoading
+                                ? 'Loading products...'
+                                : `Showing ${products.length} of ${pagination.total} products`
+                            }
+                        </p>
                     </div>
 
                     <div className="products-controls">
                         <div className="sort-control">
                             <span>Sort by:</span>
                             <Select
-                                value={sortBy}
-                                onChange={setSortBy}
+                                value={filters.sort === '-price' ? 'price-high' : filters.sort === 'price' ? 'price-low' : 'relevance'}
+                                onChange={handleSortChange}
                                 options={[
                                     { value: 'relevance', label: 'Relevance' },
                                     { value: 'price-low', label: 'Price: Low to High' },
@@ -322,45 +399,68 @@ function ProductsPage() {
                             <button
                                 key={filter.key}
                                 className="filter-tag"
-                                onClick={() => removeFilter(filter.key)}
+                                onClick={() => {
+                                    if (filter.key === 'vehicle') {
+                                        setFilters({ make: '', model: '', year: '' });
+                                    } else {
+                                        setFilter(filter.key, '');
+                                        fetchProducts();
+                                    }
+                                }}
                             >
                                 {filter.label}
                                 <X size={14} />
                             </button>
                         ))}
-                        <button className="clear-filters" onClick={clearAllFilters}>
+                        <button className="clear-filters" onClick={handleClearFilters}>
                             Clear all filters
                         </button>
                     </div>
                 )}
 
-                {/* Products Grid */}
-                <div className={`products-grid ${viewMode === 'list' ? 'list-view' : ''}`}>
-                    {MOCK_PRODUCTS.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                    ))}
-                </div>
-
-                {/* Pagination */}
-                <div className="pagination">
-                    <button className="pagination-btn prev" disabled>
-                        <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />
-                        Previous
-                    </button>
-
-                    <div className="pagination-pages">
-                        <button className="page active">1</button>
-                        <button className="page">2</button>
-                        <button className="page">3</button>
-                        <span className="page-ellipsis">...</span>
-                        <button className="page">12</button>
+                {/* Loading State */}
+                {isLoading && (
+                    <div className="products-loading">
+                        <Loader2 size={32} className="loading-spinner" />
+                        <p>Loading products...</p>
                     </div>
+                )}
 
-                    <button className="pagination-btn next">
-                        Next
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
+                {/* Error State */}
+                {error && !isLoading && (
+                    <div className="products-error">
+                        <AlertCircle size={48} />
+                        <h3>Failed to load products</h3>
+                        <p>{error}</p>
+                        <Button onClick={() => fetchProducts()}>Try Again</Button>
+                    </div>
+                )}
+
+                {/* Empty State */}
+                {!isLoading && !error && products.length === 0 && (
+                    <div className="products-empty">
+                        <HelpCircle size={48} />
+                        <h3>No products found</h3>
+                        <p>Try adjusting your filters or search criteria</p>
+                        <Button variant="outline" onClick={handleClearFilters}>
+                            Clear Filters
+                        </Button>
+                    </div>
+                )}
+
+                {/* Products Grid */}
+                {!isLoading && !error && products.length > 0 && (
+                    <>
+                        <div className={`products-grid ${viewMode === 'list' ? 'list-view' : ''}`}>
+                            {products.map((product) => (
+                                <ProductCard key={product.id || product._id} product={product} />
+                            ))}
+                        </div>
+
+                        {/* Pagination */}
+                        {pagination.pages > 1 && renderPagination()}
+                    </>
+                )}
 
                 {/* Can't Find CTA */}
                 <div className="cant-find-section">

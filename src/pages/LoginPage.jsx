@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import useAuthStore from '../store/authStore';
+import useCartStore from '../store/cartStore';
 import './LoginPage.css';
 
 function LoginPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { user, isLoading, setLoading, login } = useAuthStore();
+    const getTotalItems = useCartStore((state) => state.getTotalItems);
+    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
     const [error, setError] = useState(null);
+
+    const cartItemCount = getTotalItems();
 
     // Redirect if already logged in
     useEffect(() => {
@@ -56,6 +61,9 @@ function LoginPage() {
                 accessToken: tokenResponse.access_token,
             });
 
+            // Sync guest cart to user's cart
+            syncFromGuestStorage();
+
             navigate('/');
         } catch (err) {
             console.error('Google login error:', err);
@@ -102,6 +110,18 @@ function LoginPage() {
                     <p>Sign in to access your account, track orders, and find the perfect parts for your vehicle.</p>
                 </div>
 
+                {/* Cart Items Notice */}
+                {cartItemCount > 0 && (
+                    <div className="login-cart-notice">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="9" cy="21" r="1" />
+                            <circle cx="20" cy="21" r="1" />
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                        </svg>
+                        <span>You have {cartItemCount} item{cartItemCount > 1 ? 's' : ''} in your cart. Sign in to save them!</span>
+                    </div>
+                )}
+
                 {/* Error Message */}
                 {error && (
                     <div className="login-error">
@@ -144,6 +164,14 @@ function LoginPage() {
                             <span>Continue with Google</span>
                         </>
                     )}
+                </button>
+
+                {/* Continue as Guest */}
+                <button
+                    className="guest-btn"
+                    onClick={() => navigate('/')}
+                >
+                    Continue as guest
                 </button>
 
                 {/* Terms */}

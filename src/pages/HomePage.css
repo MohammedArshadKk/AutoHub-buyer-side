@@ -257,3 +257,30 @@
     border-color: var(--primary);
     color: white;
 }
+
+/* Trending Loading State */
+.trending-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-12) var(--space-4);
+    gap: var(--space-4);
+    color: var(--text-secondary);
+}
+
+.trending-loading .loading-spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* Trending Empty State */
+.trending-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-12) var(--space-4);
+    gap: var(--space-4);
+    color: var(--text-secondary);
+    text-align: center;
+}

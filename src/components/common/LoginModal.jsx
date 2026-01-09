@@ -1,19 +1,59 @@
 import { useLocation } from 'react-router-dom';
+import { useGoogleLogin } from '@react-oauth/google';
 import useAuthStore from '../../store/authStore';
-import authService from '../../services/authService';
+import useCartStore from '../../store/cartStore';
 import './LoginModal.css';
 
 function LoginModal() {
-    const { showLoginModal, closeLoginModal } = useAuthStore();
+    const { showLoginModal, closeLoginModal, login, setLoading, executePendingAction } = useAuthStore();
+    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
+    const getTotalItems = useCartStore((state) => state.getTotalItems);
     const location = useLocation();
 
-    if (!showLoginModal) return null;
+    const cartItemCount = getTotalItems();
 
-    const handleGoogleLogin = () => {
-        // Save current location to redirect back after login
-        localStorage.setItem('authRedirect', location.pathname);
-        authService.initiateGoogleLogin();
+    const handleGoogleSuccess = async (tokenResponse) => {
+        try {
+            setLoading(true);
+            // Fetch user info from Google using access token
+            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+            });
+            const userInfo = await userInfoResponse.json();
+
+            // Set user in store
+            login({
+                id: userInfo.sub,
+                displayName: userInfo.name,
+                email: userInfo.email,
+                photoURL: userInfo.picture,
+                accessToken: tokenResponse.access_token,
+            });
+
+            // Sync guest cart to user's cart
+            syncFromGuestStorage();
+
+            // Execute any pending action
+            executePendingAction();
+
+            closeLoginModal();
+        } catch (err) {
+            console.error('Google login error:', err);
+        } finally {
+            setLoading(false);
+        }
     };
+
+    const handleGoogleError = () => {
+        console.error('Google sign-in was cancelled or failed');
+    };
+
+    const googleLogin = useGoogleLogin({
+        onSuccess: handleGoogleSuccess,
+        onError: handleGoogleError,
+    });
+
+    if (!showLoginModal) return null;
 
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) {
@@ -39,10 +79,25 @@ function LoginModal() {
 
                 <h2 className="login-modal-title">Sign in Required</h2>
                 <p className="login-modal-text">
-                    Please sign in to continue with this action. Your cart and preferences will be saved to your account.
+                    {cartItemCount > 0
+                        ? `Sign in to save your ${cartItemCount} cart item${cartItemCount > 1 ? 's' : ''} and complete your purchase.`
+                        : 'Please sign in to continue with this action. Your cart and preferences will be saved to your account.'
+                    }
                 </p>
 
-                <button className="login-modal-google-btn" onClick={handleGoogleLogin}>
+                {/* Cart items indicator */}
+                {cartItemCount > 0 && (
+                    <div className="login-modal-cart-info">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="9" cy="21" r="1" />
+                            <circle cx="20" cy="21" r="1" />
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                        </svg>
+                        <span>{cartItemCount} item{cartItemCount > 1 ? 's' : ''} in cart</span>
+                    </div>
+                )}
+
+                <button className="login-modal-google-btn" onClick={() => googleLogin()}>
                     <svg className="google-icon" viewBox="0 0 24 24">
                         <path
                             fill="#4285F4"

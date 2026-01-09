@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Car,
@@ -9,58 +10,17 @@ import {
     ShieldCheck,
     Award,
     Clock,
-    ArrowRight
+    ArrowRight,
+    Loader2
 } from 'lucide-react';
 import VehicleSelector from '../components/features/VehicleSelector';
 import CategoryCard from '../components/features/CategoryCard';
 import ProductCard from '../components/features/ProductCard';
+import useProductStore from '../store/productStore';
 import './HomePage.css';
 
-// Mock trending products data
-const TRENDING_PRODUCTS = [
-    {
-        id: '1',
-        name: 'Front Bumper Assembly - Midnight Black',
-        sku: 'TY-BMP-0821',
-        price: 350.00,
-        shipping: 45.00,
-        condition: 'used-good',
-        compatibleVehicle: 'Toyota Camry 2018-2022',
-        image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
-    },
-    {
-        id: '2',
-        name: 'LED Headlight Assembly (Right Side)',
-        sku: 'BMW-HDL-9393',
-        price: 850.00,
-        shipping: 'free',
-        condition: 'refurbished',
-        compatibleVehicle: 'BMW 3 Series (F30)',
-        image: 'https://images.unsplash.com/photo-1489824904134-891ab64532f1?w=400&h=300&fit=crop',
-    },
-    {
-        id: '3',
-        name: 'High Output Alternator 220A',
-        sku: 'FRD-ALT-4420',
-        price: 120.00,
-        shipping: 20.00,
-        condition: 'used-fair',
-        compatibleVehicle: 'Ford F-150 2018-2023',
-        image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=400&h=300&fit=crop',
-    },
-    {
-        id: '4',
-        name: 'Side Mirror Assembly (Left, Heated)',
-        sku: 'HND-MIR-1234',
-        price: 85.00,
-        shipping: 'free',
-        condition: 'used-excellent',
-        compatibleVehicle: 'Honda Civic 2016-2021',
-        image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&h=300&fit=crop',
-    },
-];
-
-const CATEGORIES = [
+// Default categories (fallback if API fails)
+const DEFAULT_CATEGORIES = [
     { icon: Car, name: 'Body Parts', slug: 'body-parts' },
     { icon: Settings, name: 'Engine', slug: 'engine' },
     { icon: Zap, name: 'Electrical', slug: 'electrical' },
@@ -69,7 +29,39 @@ const CATEGORIES = [
     { icon: CircleDot, name: 'Suspension', slug: 'suspension' },
 ];
 
+// Map category slugs to icons
+const CATEGORY_ICONS = {
+    'body-parts': Car,
+    'engine': Settings,
+    'electrical': Zap,
+    'lighting': Lightbulb,
+    'cooling': Thermometer,
+    'suspension': CircleDot,
+};
+
 function HomePage() {
+    const {
+        trendingProducts,
+        trendingLoading,
+        fetchTrendingProducts,
+        categories,
+        fetchCategories
+    } = useProductStore();
+
+    // Fetch trending products and categories on mount
+    useEffect(() => {
+        fetchTrendingProducts(4);
+        fetchCategories();
+    }, [fetchTrendingProducts, fetchCategories]);
+
+    // Use API categories or fallback to defaults
+    const displayCategories = categories.length > 0
+        ? categories.slice(0, 6).map(cat => ({
+            ...cat,
+            icon: CATEGORY_ICONS[cat.slug] || Car,
+        }))
+        : DEFAULT_CATEGORIES;
+
     return (
         <div className="home-page">
             {/* Hero Section */}
@@ -115,14 +107,14 @@ function HomePage() {
             <section className="categories-section container">
                 <div className="section-header">
                     <h2 className="section-title">Featured Categories</h2>
-                    <Link to="/categories" className="section-link">
+                    <Link to="/products" className="section-link">
                         View All Categories
                         <ArrowRight size={16} />
                     </Link>
                 </div>
 
                 <div className="categories-grid">
-                    {CATEGORIES.map((category) => (
+                    {displayCategories.map((category) => (
                         <CategoryCard key={category.slug} {...category} />
                     ))}
                 </div>
@@ -141,11 +133,26 @@ function HomePage() {
                     </Link>
                 </div>
 
-                <div className="products-grid">
-                    {TRENDING_PRODUCTS.map((product) => (
-                        <ProductCard key={product.id} product={product} />
-                    ))}
-                </div>
+                {trendingLoading ? (
+                    <div className="trending-loading">
+                        <Loader2 size={32} className="loading-spinner" />
+                        <p>Loading trending parts...</p>
+                    </div>
+                ) : trendingProducts.length > 0 ? (
+                    <div className="products-grid">
+                        {trendingProducts.map((product) => (
+                            <ProductCard key={product.id || product._id} product={product} />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="trending-empty">
+                        <p>No trending products available at the moment.</p>
+                        <Link to="/products" className="section-link">
+                            Browse All Products
+                            <ArrowRight size={16} />
+                        </Link>
+                    </div>
+                )}
             </section>
 
             {/* CTA Section */}
