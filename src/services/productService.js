@@ -55,10 +55,19 @@ const productService = {
      * @returns {Promise<Array>}
      */
     getTrendingProducts: async (limit = 4) => {
-        const response = await fetchWithCredentials(
-            `${PRODUCT_ENDPOINTS.trending}?limit=${limit}`
-        );
-        return response.data?.products || [];
+        try {
+            const response = await fetchWithCredentials(
+                `${PRODUCT_ENDPOINTS.trending}?limit=${limit}`
+            );
+            return response.data?.products || [];
+        } catch (error) {
+            // Endpoint might not be implemented yet - fail silently
+            if (error.status === 400 || error.status === 404) {
+                console.debug('Trending products endpoint not available');
+                return [];
+            }
+            throw error;
+        }
     },
 
     /**
@@ -66,8 +75,17 @@ const productService = {
      * @returns {Promise<Array>}
      */
     getCategories: async () => {
-        const response = await fetchWithCredentials(PRODUCT_ENDPOINTS.categories);
-        return response.data?.categories || [];
+        try {
+            const response = await fetchWithCredentials(PRODUCT_ENDPOINTS.categories);
+            return response.data?.categories || [];
+        } catch (error) {
+            // Endpoint might not be implemented yet - fail silently
+            if (error.status === 404) {
+                console.debug('Categories endpoint not available');
+                return [];
+            }
+            throw error;
+        }
     },
 
     /**

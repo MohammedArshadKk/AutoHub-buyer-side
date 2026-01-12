@@ -1,59 +1,27 @@
-import { useLocation } from 'react-router-dom';
-import { useGoogleLogin } from '@react-oauth/google';
-import useAuthStore from '../../store/authStore';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import useCartStore from '../../store/cartStore';
 import './LoginModal.css';
 
 function LoginModal() {
-    const { showLoginModal, closeLoginModal, login, setLoading, executePendingAction } = useAuthStore();
-    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
+    const navigate = useNavigate();
+    const { user, login } = useAuth();
+    const showLoginModal = useCartStore((state) => state.showLoginModal);
+    const closeLoginModal = useCartStore((state) => state.closeLoginModal);
     const getTotalItems = useCartStore((state) => state.getTotalItems);
-    const location = useLocation();
 
     const cartItemCount = getTotalItems();
 
-    const handleGoogleSuccess = async (tokenResponse) => {
-        try {
-            setLoading(true);
-            // Fetch user info from Google using access token
-            const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-            });
-            const userInfo = await userInfoResponse.json();
-
-            // Set user in store
-            login({
-                id: userInfo.sub,
-                displayName: userInfo.name,
-                email: userInfo.email,
-                photoURL: userInfo.picture,
-                accessToken: tokenResponse.access_token,
-            });
-
-            // Sync guest cart to user's cart
-            syncFromGuestStorage();
-
-            // Execute any pending action
-            executePendingAction();
-
-            closeLoginModal();
-        } catch (err) {
-            console.error('Google login error:', err);
-        } finally {
-            setLoading(false);
+    const handleLogin = () => {
+        // Save the callback action before redirecting
+        const pendingAction = useCartStore.getState().getPendingAction();
+        if (pendingAction) {
+            localStorage.setItem('authRedirect', window.location.pathname);
         }
+        login(); // This redirects to backend OAuth
     };
 
-    const handleGoogleError = () => {
-        console.error('Google sign-in was cancelled or failed');
-    };
-
-    const googleLogin = useGoogleLogin({
-        onSuccess: handleGoogleSuccess,
-        onError: handleGoogleError,
-    });
-
-    if (!showLoginModal) return null;
+    if (!showLoginModal || user) return null;
 
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) {
@@ -97,7 +65,7 @@ function LoginModal() {
                     </div>
                 )}
 
-                <button className="login-modal-google-btn" onClick={() => googleLogin()}>
+                <button className="login-modal-google-btn" onClick={handleLogin}>
                     <svg className="google-icon" viewBox="0 0 24 24">
                         <path
                             fill="#4285F4"

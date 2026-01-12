@@ -1,4 +1,5 @@
-import useAuthStore from '../store/authStore';
+import { useAuth } from '../context/AuthContext';
+import useCartStore from '../store/cartStore';
 
 /**
  * Custom hook that provides a function to wrap protected actions
@@ -17,7 +18,8 @@ import useAuthStore from '../store/authStore';
  * };
  */
 function useRequireAuth() {
-    const { user, openLoginModal } = useAuthStore();
+    const { user } = useAuth();
+    const { openLoginModal } = useCartStore();
 
     /**
      * Wraps a callback function with authentication check

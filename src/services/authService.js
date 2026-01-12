@@ -5,17 +5,10 @@ import { AUTH_ENDPOINTS, fetchWithCredentials } from '../config/api';
  */
 const authService = {
     /**
-     * Get the Google OAuth login URL
-     * Redirects the user to Google for authentication
+     * Initiate Google OAuth login
+     * This redirects user to backend which redirects to Google
      */
-    getGoogleLoginUrl: () => {
-        return AUTH_ENDPOINTS.googleLogin;
-    },
-
-    /**
-     * Initiate Google login by redirecting to OAuth URL
-     */
-    initiateGoogleLogin: () => {
+    loginWithGoogle: () => {
         window.location.href = AUTH_ENDPOINTS.googleLogin;
     },
 

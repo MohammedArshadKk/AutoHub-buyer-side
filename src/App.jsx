@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { ThemeProvider } from './context/ThemeContext';
-import AuthProvider from './components/auth/AuthProvider';
+import { AuthProvider } from './context/AuthContext';
+import AuthProviderLogic from './components/auth/AuthProvider';
+import ProtectedRoute from './components/common/ProtectedRoute';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import LoginModal from './components/common/LoginModal';
@@ -13,22 +14,20 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import CartPage from './pages/CartPage';
 import './index.css';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
 /**
  * Auto Hub Buyer Side Application
  * 
  * Authentication Flow:
- * - Uses client-side Google OAuth via @react-oauth/google
+ * - Uses backend cookie-based Google OAuth
  * - Guest users can browse and add to cart
  * - Cart syncs to account on login
  */
 function App() {
   return (
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <ThemeProvider>
-        <BrowserRouter>
-          <AuthProvider>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AuthProviderLogic>
             <div className="app">
               <Routes>
                 {/* Auth pages without header/footer */}
@@ -47,6 +46,7 @@ function App() {
                           <Route path="/products" element={<ProductsPage />} />
                           <Route path="/products/:category" element={<ProductsPage />} />
                           <Route path="/product/:id" element={<ProductDetailPage />} />
+                          {/* Cart is accessible to guests, authentication required only at checkout */}
                           <Route path="/cart" element={<CartPage />} />
                         </Routes>
                       </main>
@@ -58,10 +58,10 @@ function App() {
               {/* Global Login Modal */}
               <LoginModal />
             </div>
-          </AuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
-    </GoogleOAuthProvider>
+          </AuthProviderLogic>
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

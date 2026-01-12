@@ -1,28 +1,21 @@
 import { useEffect, useRef } from 'react';
-import useAuthStore from '../../store/authStore';
-import useCartStore from '../../store/cartStore';
+import { useAuth } from '../../context/AuthContext';
+import useCartStore, { setCartAuthChecker } from '../../store/cartStore';
 
 /**
  * AuthProvider Component
- * Handles initial authentication check for client-side OAuth.
- * Uses persisted user from localStorage (via Zustand).
- * Wrap your app with this component to enable auth features.
+ * Handles cart synchronization when user logs in.
+ * Auth state is managed by AuthContext.
  */
 function AuthProvider({ children }) {
-    const { user, isInitialized, setInitialized } = useAuthStore();
-    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
+    const { user, isAuthenticated } = useAuth();
+    const { syncGuestCartToBackend, fetchCart } = useCartStore();
     const prevUserRef = useRef(null);
-    const hasInitialized = useRef(false);
 
-    // Initialize auth state on mount
-    // For client-side OAuth, we rely on persisted user from localStorage
+    // Set auth checker for cart store
     useEffect(() => {
-        if (!hasInitialized.current) {
-            hasInitialized.current = true;
-            // Mark as initialized - user is already loaded from localStorage by Zustand persist
-            setInitialized(true);
-        }
-    }, [setInitialized]);
+        setCartAuthChecker(() => isAuthenticated);
+    }, [isAuthenticated]);
 
     // Handle user login/logout transitions
     useEffect(() => {
@@ -30,22 +23,29 @@ function AuthProvider({ children }) {
 
         // User just logged in (was null, now has user)
         if (!prevUser && user) {
-            // Sync guest cart when user logs in
-            syncFromGuestStorage();
+            // Sync guest cart to backend when user logs in
+            syncGuestCartToBackend().catch((error) => {
+                console.debug('Cart sync handled:', error?.message);
+            });
+        }
+
+        // User just logged out (had user, now null)
+        if (prevUser && !user) {
+            // Cart is already cleared by logout action in AuthContext
         }
 
         // Update ref for next comparison
         prevUserRef.current = user;
-    }, [user, syncFromGuestStorage]);
+    }, [user, syncGuestCartToBackend]);
 
-    // Show loading while initializing
-    if (!isInitialized) {
-        return (
-            <div className="auth-provider-loading">
-                <div className="auth-provider-spinner" />
-            </div>
-        );
-    }
+    // Fetch cart on mount if user is logged in
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchCart().catch((error) => {
+                console.debug('Initial cart fetch handled:', error?.message);
+            });
+        }
+    }, [isAuthenticated, fetchCart]);
 
     return children;
 }

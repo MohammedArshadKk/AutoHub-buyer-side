@@ -22,7 +22,7 @@ import Button from '../components/common/Button';
 import { ConditionBadge } from '../components/common/Badge';
 import useProductStore from '../store/productStore';
 import useCartStore from '../store/cartStore';
-import useAuthStore from '../store/authStore';
+import { useAuth } from '../context/AuthContext';
 import useRequireAuth from '../hooks/useRequireAuth';
 import './ProductDetailPage.css';
 
@@ -43,7 +43,7 @@ function ProductDetailPage() {
     const isInCart = useCartStore((state) => state.isInCart);
     const getItemQuantity = useCartStore((state) => state.getItemQuantity);
     const updateQuantity = useCartStore((state) => state.updateQuantity);
-    const user = useAuthStore((state) => state.user);
+    const { user } = useAuth();
 
     const [selectedImage, setSelectedImage] = useState(0);
     const [quantity, setQuantity] = useState(1);
@@ -115,6 +115,21 @@ function ProductDetailPage() {
     const handleUpdateCartQuantity = (newQty) => {
         if (productId && newQty >= 0) {
             updateQuantity(productId, newQty);
+        }
+    };
+
+    const handleBuyNow = () => {
+        if (product && inStock) {
+            // Add to cart if not already in cart or update quantity
+            if (!productInCart) {
+                addItem({
+                    ...product,
+                    id: productId,
+                    image: images[0],
+                }, quantity);
+            }
+            // Navigate to cart page
+            navigate('/cart');
         }
     };
 
@@ -328,64 +343,81 @@ function ProductDetailPage() {
                     <div className="product-actions">
                         {!productInCart ? (
                             <>
-                                <div className="quantity-selector">
-                                    <button
-                                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                        disabled={quantity <= 1}
-                                    >
-                                        <Minus size={16} />
-                                    </button>
-                                    <span>{quantity}</span>
-                                    <button
-                                        onClick={() => setQuantity(q => q + 1)}
-                                        disabled={product.stock && quantity >= product.stock}
-                                    >
-                                        <Plus size={16} />
-                                    </button>
+                                <div className="product-actions-main">
+                                    <div className="quantity-selector">
+                                        <button
+                                            onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                                            disabled={quantity <= 1}
+                                        >
+                                            <Minus size={16} />
+                                        </button>
+                                        <span>{quantity}</span>
+                                        <button
+                                            onClick={() => setQuantity(q => q + 1)}
+                                            disabled={product.stock && quantity >= product.stock}
+                                        >
+                                            <Plus size={16} />
+                                        </button>
+                                    </div>
+                                    <div className="product-actions-buttons">
+                                        <Button
+                                            size="lg"
+                                            className="add-to-cart-btn"
+                                            onClick={handleAddToCart}
+                                            disabled={!inStock}
+                                        >
+                                            <ShoppingCart size={18} />
+                                            {inStock ? 'Add to Cart' : 'Out of Stock'}
+                                        </Button>
+                                        <Button
+                                            size="lg"
+                                            variant="outline"
+                                            className="buy-now-btn"
+                                            onClick={handleBuyNow}
+                                            disabled={!inStock}
+                                        >
+                                            {inStock ? 'Buy Now' : 'Out of Stock'}
+                                        </Button>
+                                    </div>
                                 </div>
-                                <Button
-                                    size="lg"
-                                    className="add-to-cart-btn"
-                                    onClick={handleAddToCart}
-                                    disabled={!inStock}
-                                >
-                                    <ShoppingCart size={18} />
-                                    {inStock ? 'Add to Cart' : 'Out of Stock'}
-                                </Button>
                             </>
                         ) : (
                             <>
-                                <div className="quantity-selector in-cart">
-                                    <button
-                                        onClick={() => handleUpdateCartQuantity(cartQuantity - 1)}
+                                <div className="product-actions-main">
+                                    <div className="quantity-selector in-cart">
+                                        <button
+                                            onClick={() => handleUpdateCartQuantity(cartQuantity - 1)}
+                                        >
+                                            <Minus size={16} />
+                                        </button>
+                                        <span>{cartQuantity}</span>
+                                        <button onClick={() => handleUpdateCartQuantity(cartQuantity + 1)}>
+                                            <Plus size={16} />
+                                        </button>
+                                    </div>
+                                    <Button
+                                        size="lg"
+                                        variant="primary"
+                                        className="add-to-cart-btn in-cart"
+                                        onClick={() => navigate('/cart')}
                                     >
-                                        <Minus size={16} />
-                                    </button>
-                                    <span>{cartQuantity}</span>
-                                    <button onClick={() => handleUpdateCartQuantity(cartQuantity + 1)}>
-                                        <Plus size={16} />
-                                    </button>
+                                        <Check size={18} />
+                                        View Cart ({cartQuantity})
+                                    </Button>
                                 </div>
-                                <Button
-                                    size="lg"
-                                    variant="primary"
-                                    className="add-to-cart-btn in-cart"
-                                    onClick={() => navigate('/cart')}
-                                >
-                                    <Check size={18} />
-                                    View Cart ({cartQuantity})
-                                </Button>
                             </>
                         )}
-                        <button
-                            className={`wishlist-btn ${isWishlisted ? 'active' : ''}`}
-                            onClick={handleWishlist}
-                        >
-                            <Heart size={20} fill={isWishlisted ? 'currentColor' : 'none'} />
-                        </button>
-                        <button className="share-btn" onClick={handleShare}>
-                            <Share2 size={20} />
-                        </button>
+                        <div className="product-actions-secondary">
+                            <button
+                                className={`wishlist-btn ${isWishlisted ? 'active' : ''}`}
+                                onClick={handleWishlist}
+                            >
+                                <Heart size={20} fill={isWishlisted ? 'currentColor' : 'none'} />
+                            </button>
+                            <button className="share-btn" onClick={handleShare}>
+                                <Share2 size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Added Message */}

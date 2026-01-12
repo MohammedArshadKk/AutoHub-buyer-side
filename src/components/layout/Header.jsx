@@ -12,7 +12,7 @@ import {
     LogOut
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import useAuthStore from '../../store/authStore';
+import { useAuth } from '../../context/AuthContext';
 import useCartStore from '../../store/cartStore';
 import './Header.css';
 
@@ -22,7 +22,7 @@ function Header() {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     const { theme, toggleTheme } = useTheme();
-    const { user, logout } = useAuthStore();
+    const { user, logout } = useAuth();
     const getTotalItems = useCartStore((state) => state.getTotalItems);
     const navigate = useNavigate();
 
@@ -36,7 +36,6 @@ function Header() {
     const handleLogout = async () => {
         await logout();
         setUserMenuOpen(false);
-        navigate('/');
     };
 
     return (
@@ -99,8 +98,8 @@ function Header() {
                                 className="user-menu-trigger"
                                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                             >
-                                {user.photoURL ? (
-                                    <img src={user.photoURL} alt="" className="user-avatar" />
+                                {user.avatar ? (
+                                    <img src={user.avatar} alt="" className="user-avatar" />
                                 ) : (
                                     <User size={20} />
                                 )}
@@ -110,7 +109,7 @@ function Header() {
                             {userMenuOpen && (
                                 <div className="user-dropdown">
                                     <div className="user-info">
-                                        <span className="user-name">{user.displayName}</span>
+                                        <span className="user-name">{user.name}</span>
                                         <span className="user-email">{user.email}</span>
                                     </div>
                                     <div className="dropdown-divider" />

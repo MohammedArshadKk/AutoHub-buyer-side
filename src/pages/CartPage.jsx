@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     ShoppingCart,
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react';
 import Button from '../components/common/Button';
 import useCartStore from '../store/cartStore';
-import useAuthStore from '../store/authStore';
+import { useAuth } from '../context/AuthContext';
 import './CartPage.css';
 
 function CartPage() {
@@ -24,10 +25,19 @@ function CartPage() {
         removeItem,
         clearCart,
         getTotalItems,
-        getTotalPrice
+        getTotalPrice,
+        fetchCart,
+        isLoading,
+        openLoginModal,
     } = useCartStore();
-    const user = useAuthStore((state) => state.user);
-    const openLoginModal = useAuthStore((state) => state.openLoginModal);
+    const { user } = useAuth();
+
+    // Fetch cart from backend for authenticated users on mount
+    useEffect(() => {
+        if (user) {
+            fetchCart();
+        }
+    }, [user, fetchCart]);
 
     const totalItems = getTotalItems();
     const subtotal = getTotalPrice();
@@ -89,11 +99,16 @@ function CartPage() {
                     <div className="cart-items">
                         {items.map((item) => {
                             const itemId = item.id || item._id;
+                            // Use priceSnapshot from backend, fallback to price for guest cart
+                            const itemPrice = item.priceSnapshot || item.price || 0;
+                            // Get image: backend returns images array, guest cart has image field
+                            const itemImage = item.images?.[0] || item.image || 'https://via.placeholder.com/120x90';
+
                             return (
                                 <div key={itemId} className="cart-item">
                                     <Link to={`/product/${itemId}`} className="item-image">
                                         <img
-                                            src={item.image || 'https://via.placeholder.com/120x90'}
+                                            src={itemImage}
                                             alt={item.name}
                                         />
                                     </Link>
@@ -102,17 +117,26 @@ function CartPage() {
                                         <Link to={`/product/${itemId}`} className="item-name">
                                             {item.name}
                                         </Link>
-                                        {item.sku && (
-                                            <span className="item-sku">SKU: {item.sku}</span>
+                                        {(item.sku || item.partNumber) && (
+                                            <span className="item-sku">
+                                                {item.partNumber ? `Part #: ${item.partNumber}` : `SKU: ${item.sku}`}
+                                            </span>
                                         )}
                                         {item.compatibleVehicle && (
                                             <span className="item-vehicle">{item.compatibleVehicle}</span>
+                                        )}
+                                        {item.compatibleVehicles && item.compatibleVehicles.length > 0 && (
+                                            <span className="item-vehicle">
+                                                Fits: {item.compatibleVehicles[0].year} {item.compatibleVehicles[0].make} {item.compatibleVehicles[0].model}
+                                            </span>
                                         )}
                                         <div className="item-shipping">
                                             <Truck size={14} />
                                             {item.shipping === 'free' || item.shipping === 0
                                                 ? 'Free Shipping'
-                                                : `+$${item.shipping} shipping`
+                                                : item.shipping
+                                                    ? `+$${item.shipping} shipping`
+                                                    : 'Shipping calculated at checkout'
                                             }
                                         </div>
                                     </div>
@@ -121,6 +145,7 @@ function CartPage() {
                                         <button
                                             onClick={() => handleQuantityChange(itemId, item.quantity - 1)}
                                             aria-label="Decrease quantity"
+                                            disabled={isLoading}
                                         >
                                             <Minus size={16} />
                                         </button>
@@ -128,6 +153,7 @@ function CartPage() {
                                         <button
                                             onClick={() => handleQuantityChange(itemId, item.quantity + 1)}
                                             aria-label="Increase quantity"
+                                            disabled={isLoading}
                                         >
                                             <Plus size={16} />
                                         </button>
@@ -135,11 +161,11 @@ function CartPage() {
 
                                     <div className="item-price">
                                         <span className="price-value">
-                                            ${(item.price * item.quantity).toFixed(2)}
+                                            ${(itemPrice * item.quantity).toFixed(2)}
                                         </span>
                                         {item.quantity > 1 && (
                                             <span className="price-each">
-                                                ${item.price.toFixed(2)} each
+                                                ${itemPrice.toFixed(2)} each
                                             </span>
                                         )}
                                     </div>
@@ -148,6 +174,7 @@ function CartPage() {
                                         className="item-remove"
                                         onClick={() => removeItem(itemId)}
                                         aria-label="Remove item"
+                                        disabled={isLoading}
                                     >
                                         <Trash2 size={18} />
                                     </button>
@@ -157,7 +184,11 @@ function CartPage() {
 
                         {/* Clear Cart */}
                         <div className="cart-actions">
-                            <button className="clear-cart-btn" onClick={clearCart}>
+                            <button
+                                className="clear-cart-btn"
+                                onClick={clearCart}
+                                disabled={isLoading}
+                            >
                                 <Trash2 size={16} />
                                 Clear Cart
                             </button>

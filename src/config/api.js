@@ -1,5 +1,5 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // Auth endpoints
 export const AUTH_ENDPOINTS = {
@@ -11,14 +11,10 @@ export const AUTH_ENDPOINTS = {
     logoutAll: `${API_BASE_URL}/auth/logout-all`,
 };
 
-// Cart endpoints (for authenticated users - when backend is ready)
+// Cart endpoints
 export const CART_ENDPOINTS = {
-    get: `${API_BASE_URL}/cart`,
-    add: `${API_BASE_URL}/cart/add`,
-    update: `${API_BASE_URL}/cart/update`,
-    remove: `${API_BASE_URL}/cart/remove`,
-    sync: `${API_BASE_URL}/cart/sync`,
-    clear: `${API_BASE_URL}/cart/clear`,
+    base: `${API_BASE_URL}/cart`,
+    item: (productId) => `${API_BASE_URL}/cart/${productId}`,
 };
 
 // Wishlist endpoints (for authenticated users - when backend is ready)

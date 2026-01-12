@@ -4,14 +4,14 @@ import { Heart, Check, ShoppingCart } from 'lucide-react';
 import { ConditionBadge } from '../common/Badge';
 import Button from '../common/Button';
 import useCartStore from '../../store/cartStore';
-import useAuthStore from '../../store/authStore';
+import { useAuth } from '../../context/AuthContext';
 import useRequireAuth from '../../hooks/useRequireAuth';
 import './ProductCard.css';
 
 function ProductCard({ product, variant = 'default' }) {
     const addItem = useCartStore((state) => state.addItem);
     const isInCart = useCartStore((state) => state.isInCart);
-    const user = useAuthStore((state) => state.user);
+    const { user } = useAuth();
     const requireAuth = useRequireAuth();
     const [showAddedMessage, setShowAddedMessage] = useState(false);
     const [isWishlisted, setIsWishlisted] = useState(false);

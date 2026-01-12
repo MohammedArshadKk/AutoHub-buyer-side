@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import useAuthStore from '../store/authStore';
+import { useAuth } from '../context/AuthContext';
 import useCartStore from '../store/cartStore';
 import guestStorageService from '../services/guestStorageService';
 import './AuthSuccessPage.css';
@@ -8,8 +8,8 @@ import './AuthSuccessPage.css';
 function AuthSuccessPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const { checkAuth, executePendingAction } = useAuthStore();
-    const syncFromGuestStorage = useCartStore((state) => state.syncFromGuestStorage);
+    const { checkAuth } = useAuth();
+    const { syncGuestCartToBackend } = useCartStore();
     const [status, setStatus] = useState('loading'); // loading, success, syncing, error
     const [message, setMessage] = useState('Completing sign in...');
 
@@ -25,51 +25,42 @@ function AuthSuccessPage() {
             }
 
             try {
-                // Verify authentication with server
-                const isAuthenticated = await checkAuth();
+                // Verify authentication with server using cookies
+                await checkAuth();
 
-                if (isAuthenticated) {
-                    // Check if there's guest data to sync
-                    const guestData = guestStorageService.getGuestDataSummary();
+                // Check if there's guest data to sync
+                const guestData = guestStorageService.getGuestDataSummary();
 
-                    if (guestData.hasData) {
-                        setStatus('syncing');
-                        setMessage(`Syncing your ${guestData.cartCount} cart item${guestData.cartCount !== 1 ? 's' : ''}...`);
+                if (guestData.hasData && guestData.cartCount > 0) {
+                    setStatus('syncing');
+                    setMessage(`Syncing your ${guestData.cartCount} cart item${guestData.cartCount !== 1 ? 's' : ''}...`);
 
-                        // Sync guest cart to authenticated cart
-                        syncFromGuestStorage();
+                    // Sync guest cart to backend
+                    await syncGuestCartToBackend();
 
-                        // Small delay to show sync message
-                        await new Promise(resolve => setTimeout(resolve, 800));
-                    }
-
-                    setStatus('success');
-                    setMessage('Sign in successful! Redirecting...');
-
-                    // Execute any pending action (like adding to cart)
-                    executePendingAction();
-
-                    // Redirect to home or previous page
-                    setTimeout(() => {
-                        const redirectTo = localStorage.getItem('authRedirect') || '/';
-                        localStorage.removeItem('authRedirect');
-                        navigate(redirectTo);
-                    }, 1000);
-                } else {
-                    setStatus('error');
-                    setMessage('Authentication failed. Please try again.');
-                    setTimeout(() => navigate('/login'), 2000);
+                    // Small delay to show sync message
+                    await new Promise(resolve => setTimeout(resolve, 800));
                 }
+
+                setStatus('success');
+                setMessage('Sign in successful! Redirecting...');
+
+                // Redirect to saved location or home
+                setTimeout(() => {
+                    const redirectTo = localStorage.getItem('authRedirect') || '/';
+                    localStorage.removeItem('authRedirect');
+                    navigate(redirectTo);
+                }, 1000);
             } catch (error) {
                 console.error('Auth callback error:', error);
                 setStatus('error');
-                setMessage('Something went wrong. Please try again.');
+                setMessage('Authentication failed. Please try again.');
                 setTimeout(() => navigate('/login'), 2000);
             }
         };
 
         handleAuthCallback();
-    }, [checkAuth, executePendingAction, navigate, searchParams, syncFromGuestStorage]);
+    }, [checkAuth, navigate, searchParams, syncGuestCartToBackend]);
 
     const getErrorMessage = (error) => {
         switch (error) {
