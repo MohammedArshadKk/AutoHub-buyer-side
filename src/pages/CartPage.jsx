@@ -35,7 +35,9 @@ function CartPage() {
     // Fetch cart from backend for authenticated users on mount
     useEffect(() => {
         if (user) {
-            fetchCart();
+            // Pass true to force fetch since we know we have a user
+            // This avoids race condition where authChecker in store isn't set yet
+            fetchCart(true);
         }
     }, [user, fetchCart]);
 

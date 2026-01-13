@@ -51,14 +51,23 @@ export const AuthProvider = ({ children }) => {
     };
 
     const logout = async () => {
+        console.log('🔐 [LOGOUT] Called');
+        console.trace('🔐 [LOGOUT] Stack trace:'); // Shows who triggered logout
+
         try {
             setLoading(true);
+            console.log('🔐 [LOGOUT] Calling backend logout service...');
             await authService.logout();
+            console.log('🔐 [LOGOUT] Backend logout successful');
+
             setUser(null);
+            console.log('🔐 [LOGOUT] User state cleared');
+
             navigate('/');
+            console.log('🔐 [LOGOUT] Redirecting to home');
         } catch (err) {
+            console.error('🔐 [LOGOUT] Error:', err);
             setError(err.message || 'Logout failed');
-            console.error('Logout error:', err);
         } finally {
             setLoading(false);
         }

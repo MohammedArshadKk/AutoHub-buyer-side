@@ -8,12 +8,13 @@ import useCartStore, { setCartAuthChecker } from '../../store/cartStore';
  * Auth state is managed by AuthContext.
  */
 function AuthProvider({ children }) {
-    const { user, isAuthenticated } = useAuth();
-    const { syncGuestCartToBackend, fetchCart } = useCartStore();
+    const { user, isAuthenticated, loading } = useAuth();
+    const { syncGuestCartToBackend } = useCartStore();
     const prevUserRef = useRef(null);
 
     // Set auth checker for cart store
     useEffect(() => {
+        // Direct integration with store
         setCartAuthChecker(() => isAuthenticated);
     }, [isAuthenticated]);
 
@@ -29,23 +30,19 @@ function AuthProvider({ children }) {
             });
         }
 
-        // User just logged out (had user, now null)
-        if (prevUser && !user) {
-            // Cart is already cleared by logout action in AuthContext
-        }
-
         // Update ref for next comparison
         prevUserRef.current = user;
     }, [user, syncGuestCartToBackend]);
 
-    // Fetch cart on mount if user is logged in
-    useEffect(() => {
-        if (isAuthenticated) {
-            fetchCart().catch((error) => {
-                console.debug('Initial cart fetch handled:', error?.message);
-            });
-        }
-    }, [isAuthenticated, fetchCart]);
+    // Show loading screen while checking auth
+    if (loading) {
+        return (
+            <div className="auth-loading-screen">
+                <div className="loading-spinner"></div>
+                <p>Initializing...</p>
+            </div>
+        );
+    }
 
     return children;
 }

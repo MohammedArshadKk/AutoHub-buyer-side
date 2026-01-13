@@ -48,9 +48,11 @@ const useCartStore = create(
              */
             addItem: async (product, quantity = 1) => {
                 const isAuth = get()._isAuthenticated();
+                console.log(`🛒 [ADD ITEM] Product: ${product.name}, Qty: ${quantity}, Auth: ${isAuth}`);
 
                 if (!isAuth) {
                     // Guest mode: Local storage
+                    console.log('🛒 [ADD ITEM] Guest mode - saving to localStorage');
                     const items = get().items;
                     const existingIndex = items.findIndex(item => item.id === product.id);
 
@@ -58,30 +60,39 @@ const useCartStore = create(
                     if (existingIndex >= 0) {
                         newItems = [...items];
                         newItems[existingIndex].quantity += quantity;
+                        console.log(`🛒 [ADD ITEM] Updated existing item. New qty: ${newItems[existingIndex].quantity}`);
                     } else {
                         newItems = [...items, { ...product, quantity, addedAt: Date.now() }];
+                        console.log('🛒 [ADD ITEM] Added new item to cart');
                     }
 
                     set({ items: newItems });
+                    console.log(`🛒 [ADD ITEM] Guest cart now has ${newItems.length} items`);
                     return;
                 }
 
                 // Authenticated mode: Backend API
+                console.log('🛒 [ADD ITEM] Authenticated mode - saving to backend');
                 set({ isLoading: true, error: null });
 
                 try {
                     const productId = product.id || product._id;
+                    console.log(`🛒 [ADD ITEM] Calling backend API for product: ${productId}`);
+
                     const cart = await cartService.addItem(productId, quantity);
+                    console.log('🛒 [ADD ITEM] Backend response:', cart);
 
                     // Transform backend cart to local format
                     const items = cart.items.map(item => ({
                         ...item.product,
                         id: item.product._id,
-                        image: item.product.images?.[0] || item.product.image, // Backward compatibility
+                        image: item.product.images?.[0] || item.product.image,
                         quantity: item.quantity,
                         priceSnapshot: item.priceSnapshot,
                         addedAt: item.addedAt,
                     }));
+
+                    console.log(`🛒 [ADD ITEM] Success - Cart now has ${items.length} items`);
 
                     set({
                         items,
@@ -89,12 +100,11 @@ const useCartStore = create(
                         lastSynced: Date.now(),
                     });
                 } catch (error) {
+                    console.error('🛒 [ADD ITEM] Failed:', error);
                     set({
                         isLoading: false,
                         error: error.message
                     });
-                    // Optionally show toast notification here
-                    console.error('Add to cart failed:', error.message);
                     throw error;
                 }
             },
@@ -192,26 +202,31 @@ const useCartStore = create(
              */
             clearCart: async () => {
                 const isAuth = get()._isAuthenticated();
+                console.log('🛒 [CLEAR CART] Called. Auth:', isAuth);
+                console.trace('🛒 [CLEAR CART] Stack trace:'); // Shows who called this
 
                 if (!isAuth) {
                     // Guest mode
+                    console.log('🛒 [CLEAR CART] Guest mode - clearing localStorage');
                     set({ items: [], lastSynced: null });
                     return;
                 }
 
                 // Authenticated mode
+                console.log('🛒 [CLEAR CART] Authenticated mode - calling backend');
                 set({ isLoading: true, error: null });
 
                 try {
                     await cartService.clearCart();
+                    console.log('🛒 [CLEAR CART] Backend cleared successfully');
                     set({
                         items: [],
                         isLoading: false,
                         lastSynced: Date.now(),
                     });
                 } catch (error) {
+                    console.error('🛒 [CLEAR CART] Failed:', error);
                     set({ isLoading: false, error: error.message });
-                    console.error('Clear cart failed:', error.message);
                     throw error;
                 }
             },
@@ -221,12 +236,14 @@ const useCartStore = create(
             /**
              * Fetch cart from backend
              * Only for authenticated users
+             * @param {boolean} isAuthorized - Force authorization check (useful when authChecker isn't ready)
              */
-            fetchCart: async () => {
-                const isAuth = get()._isAuthenticated();
+            fetchCart: async (isAuthorized = false) => {
+                const isAuth = isAuthorized || get()._isAuthenticated();
+                console.log('🛒 [FETCH CART] Called. Authenticated:', isAuth);
 
                 if (!isAuth) {
-                    console.warn('Cannot fetch cart: User not authenticated');
+                    console.warn('🛒 [FETCH CART] Skipped - User not authenticated');
                     return;
                 }
 
@@ -234,15 +251,18 @@ const useCartStore = create(
 
                 try {
                     const cart = await cartService.getCart();
+                    console.log('🛒 [FETCH CART] Success - Raw cart:', cart);
 
                     const items = cart.items.map(item => ({
-                        ...item.product,
-                        id: item.product._id,
+                        ...item.product, // Spread product details first
+                        id: item.product._id, // Ensure ID is top-level
                         image: item.product.images?.[0] || item.product.image,
                         quantity: item.quantity,
                         priceSnapshot: item.priceSnapshot,
                         addedAt: item.addedAt,
                     }));
+
+                    console.log(`🛒 [FETCH CART] Processed ${items.length} items for store`);
 
                     set({
                         items,
@@ -250,17 +270,20 @@ const useCartStore = create(
                         lastSynced: Date.now(),
                     });
                 } catch (error) {
-                    // Special handling for 401 - user session expired or invalid
+                    console.error('🛒 [FETCH CART] Error:', error);
+
+                    // CRITICAL: Don't clear cart on errors!
+                    // 401 means session expired, not that cart should be deleted
+                    // Cart data is preserved in localStorage for recovery
                     if (error.status === 401) {
-                        console.warn('Cart fetch failed: User not authenticated or session expired');
-                        // Clear error state silently - this is expected when not logged in
-                        set({ isLoading: false, error: null, items: [] });
+                        console.warn('🛒 [FETCH CART] Auth failed - Session may have expired. Cart preserved in local state.');
+                        set({ isLoading: false, error: 'Authentication required' });
                         return;
                     }
 
-                    // For other errors, log and set error state
+                    // For other errors, just set error state
+                    console.error('🛒 [FETCH CART] Failed:', error.message);
                     set({ isLoading: false, error: error.message });
-                    console.error('Fetch cart failed:', error.message);
                 }
             },
 
