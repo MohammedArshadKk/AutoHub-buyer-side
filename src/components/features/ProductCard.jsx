@@ -49,16 +49,18 @@ function ProductCard({ product, variant = 'default' }) {
 
         if (!inStock) return;
 
-        // Allow guest users to add to cart - no auth required!
-        addItem({
-            ...product,
-            id: productId,
-            image: thumbnail, // Normalize to single image for cart
-        });
+        // Require authentication to add to cart
+        requireAuth(() => {
+            addItem({
+                ...product,
+                id: productId,
+                image: thumbnail, // Normalize to single image for cart
+            });
 
-        // Show feedback
-        setShowAddedMessage(true);
-        setTimeout(() => setShowAddedMessage(false), 2000);
+            // Show feedback
+            setShowAddedMessage(true);
+            setTimeout(() => setShowAddedMessage(false), 2000);
+        });
     };
 
     const handleWishlist = (e) => {
@@ -212,13 +214,6 @@ function ProductCard({ product, variant = 'default' }) {
                         <span className="shipping-method">{product.shippingMethod}</span>
                     )}
                 </div>
-
-                {/* Guest hint - subtle message for non-logged-in users */}
-                {!user && !isCompact && (
-                    <p className="product-guest-hint">
-                        Sign in to save your cart
-                    </p>
-                )}
             </div>
         </Link>
     );

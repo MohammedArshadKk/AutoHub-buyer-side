@@ -102,13 +102,15 @@ function ProductDetailPage() {
 
     const handleAddToCart = () => {
         if (product && inStock) {
-            addItem({
-                ...product,
-                id: productId,
-                image: images[0],
-            }, quantity);
-            setShowAddedMessage(true);
-            setTimeout(() => setShowAddedMessage(false), 3000);
+            requireAuth(() => {
+                addItem({
+                    ...product,
+                    id: productId,
+                    image: images[0],
+                }, quantity);
+                setShowAddedMessage(true);
+                setTimeout(() => setShowAddedMessage(false), 3000);
+            });
         }
     };
 
@@ -120,16 +122,18 @@ function ProductDetailPage() {
 
     const handleBuyNow = () => {
         if (product && inStock) {
-            // Add to cart if not already in cart or update quantity
-            if (!productInCart) {
-                addItem({
-                    ...product,
-                    id: productId,
-                    image: images[0],
-                }, quantity);
-            }
-            // Navigate to cart page
-            navigate('/cart');
+            requireAuth(() => {
+                // Add to cart if not already in cart or update quantity
+                if (!productInCart) {
+                    addItem({
+                        ...product,
+                        id: productId,
+                        image: images[0],
+                    }, quantity);
+                }
+                // Navigate to cart page
+                navigate('/cart');
+            });
         }
     };
 
