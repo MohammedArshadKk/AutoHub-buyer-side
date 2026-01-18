@@ -29,15 +29,18 @@ function LoginPage() {
             {/* Login Card */}
             <div className="login-card">
                 {/* Logo */}
-                <div className="login-logo">
-                    <div className="login-logo-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                            <path d="M2 17l10 5 10-5" />
-                            <path d="M2 12l10 5 10-5" />
-                        </svg>
+                <div className="login-header">
+                    <div className="login-logo">
+                        <div className="login-logo-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                <path d="M2 17l10 5 10-5" />
+                                <path d="M2 12l10 5 10-5" />
+                            </svg>
+                        </div>
+                        <h1 className="login-brand">AutoHub</h1>
+                        <p className="login-subtitle">Sign in to access your account</p>
                     </div>
-                    <h1 className="login-brand">AutoPartsPro</h1>
                 </div>
 
                 {/* Welcome Text */}

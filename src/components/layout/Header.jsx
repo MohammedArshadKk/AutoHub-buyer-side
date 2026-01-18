@@ -50,7 +50,7 @@ function Header() {
                             <path d="M2 12l10 5 10-5" />
                         </svg>
                     </div>
-                    <span className="logo-text">AutoPartsPro</span>
+                    <span className="logo-text">AutoHub</span>
                 </Link>
 
                 {/* Search Bar - Desktop */}
@@ -68,7 +68,7 @@ function Header() {
                 {/* Navigation - Desktop */}
                 <nav className="header-nav">
                     <Link to="/products" className="nav-link">Browse Parts</Link>
-                    <Link to="/sell" className="nav-link">Sell a Part</Link>
+
                     <Link to="/support" className="nav-link">Support</Link>
                 </nav>
 
@@ -158,7 +158,7 @@ function Header() {
 
                 <nav className="mobile-nav">
                     <Link to="/products" onClick={() => setMobileMenuOpen(false)}>Browse Parts</Link>
-                    <Link to="/sell" onClick={() => setMobileMenuOpen(false)}>Sell a Part</Link>
+
                     <Link to="/orders" onClick={() => setMobileMenuOpen(false)}>My Orders</Link>
                     <Link to="/garage" onClick={() => setMobileMenuOpen(false)}>My Garage</Link>
                     <Link to="/support" onClick={() => setMobileMenuOpen(false)}>Support</Link>
