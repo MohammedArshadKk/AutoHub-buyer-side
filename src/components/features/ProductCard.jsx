@@ -32,12 +32,9 @@ function ProductCard({ product, variant = 'default' }) {
         return null;
     };
 
-    // Format price (handle INR and USD)
+    // Format price in INR
     const formatPrice = (price) => {
-        if (product.currency === 'INR') {
-            return `₹${price?.toLocaleString('en-IN')}`;
-        }
-        return `$${price?.toFixed(2)}`;
+        return `₹${price?.toLocaleString('en-IN')}`;
     };
 
     // Check if product is in stock

@@ -12,6 +12,9 @@ import AuthSuccessPage from './pages/AuthSuccessPage';
 import ProductsPage from './pages/ProductsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
+import PaymentDetailsPage from './pages/PaymentDetailsPage';
+import OrderSuccessPage from './pages/OrderSuccessPage';
 import './index.css';
 
 /**
@@ -48,6 +51,33 @@ function App() {
                           <Route path="/product/:id" element={<ProductDetailPage />} />
                           {/* Cart is accessible to guests, authentication required only at checkout */}
                           <Route path="/cart" element={<CartPage />} />
+                          {/* Checkout - protected route */}
+                          <Route
+                            path="/checkout"
+                            element={
+                              <ProtectedRoute>
+                                <CheckoutPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          {/* Payment - protected route */}
+                          <Route
+                            path="/payment"
+                            element={
+                              <ProtectedRoute>
+                                <PaymentDetailsPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          {/* Order Success - protected route */}
+                          <Route
+                            path="/order-success"
+                            element={
+                              <ProtectedRoute>
+                                <OrderSuccessPage />
+                              </ProtectedRoute>
+                            }
+                          />
                         </Routes>
                       </main>
                       <Footer />

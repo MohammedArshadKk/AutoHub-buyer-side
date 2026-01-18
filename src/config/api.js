@@ -25,6 +25,13 @@ export const WISHLIST_ENDPOINTS = {
     sync: `${API_BASE_URL}/wishlist/sync`,
 };
 
+// Address endpoints
+export const ADDRESS_ENDPOINTS = {
+    list: `${API_BASE_URL}/addresses`,
+    detail: (id) => `${API_BASE_URL}/addresses/${id}`,
+    setDefault: (id) => `${API_BASE_URL}/addresses/${id}/default`,
+};
+
 // Product endpoints
 export const PRODUCT_ENDPOINTS = {
     list: `${API_BASE_URL}/products`,

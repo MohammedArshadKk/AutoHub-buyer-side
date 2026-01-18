@@ -57,10 +57,13 @@ function CartPage() {
 
     const handleCheckout = () => {
         if (!user) {
+            // Show login modal if not authenticated
             openLoginModal(() => {
+                // After login, proceed to checkout
                 navigate('/checkout');
             });
         } else {
+            // Navigate to checkout/address selection
             navigate('/checkout');
         }
     };
@@ -137,7 +140,7 @@ function CartPage() {
                                             {item.shipping === 'free' || item.shipping === 0
                                                 ? 'Free Shipping'
                                                 : item.shipping
-                                                    ? `+$${item.shipping} shipping`
+                                                    ? `+₹${item.shipping} shipping`
                                                     : 'Shipping calculated at checkout'
                                             }
                                         </div>
@@ -163,11 +166,11 @@ function CartPage() {
 
                                     <div className="item-price">
                                         <span className="price-value">
-                                            ${(itemPrice * item.quantity).toFixed(2)}
+                                            ₹{(itemPrice * item.quantity).toLocaleString('en-IN')}
                                         </span>
                                         {item.quantity > 1 && (
                                             <span className="price-each">
-                                                ${itemPrice.toFixed(2)} each
+                                                ₹{itemPrice.toLocaleString('en-IN')} each
                                             </span>
                                         )}
                                     </div>
@@ -214,26 +217,26 @@ function CartPage() {
                         <div className="summary-lines">
                             <div className="summary-line">
                                 <span>Subtotal ({totalItems} items)</span>
-                                <span>${subtotal.toFixed(2)}</span>
+                                <span>₹{subtotal.toLocaleString('en-IN')}</span>
                             </div>
                             <div className="summary-line">
                                 <span>Shipping</span>
                                 <span className={shipping === 0 ? 'free' : ''}>
-                                    {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                                    {shipping === 0 ? 'FREE' : `₹${shipping.toLocaleString('en-IN')}`}
                                 </span>
                             </div>
                             <div className="summary-line">
                                 <span>Estimated Tax</span>
-                                <span>${tax.toFixed(2)}</span>
+                                <span>₹{tax.toLocaleString('en-IN')}</span>
                             </div>
                             {subtotal < 100 && (
                                 <div className="free-shipping-hint">
-                                    Add ${(100 - subtotal).toFixed(2)} more for FREE shipping!
+                                    Add ₹{(100 - subtotal).toLocaleString('en-IN')} more for FREE shipping!
                                 </div>
                             )}
                             <div className="summary-line total">
                                 <span>Total</span>
-                                <span>${total.toFixed(2)}</span>
+                                <span>₹{total.toLocaleString('en-IN')}</span>
                             </div>
                         </div>
 

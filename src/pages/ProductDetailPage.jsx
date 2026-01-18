@@ -85,12 +85,9 @@ function ProductDetailPage() {
         return [];
     };
 
-    // Format price
+    // Format price in INR
     const formatPrice = (price) => {
-        if (product?.currency === 'INR') {
-            return `₹${price?.toLocaleString('en-IN')}`;
-        }
-        return `$${price?.toFixed(2)}`;
+        return `₹${price?.toLocaleString('en-IN')}`;
     };
 
     // Check stock

@@ -1,0 +1,339 @@
+import { useState, useRef, useCallback } from 'react';
+import { MapPin, Navigation, AlertCircle, Check, X } from 'lucide-react';
+import { loadGoogleMaps } from '../../utils/googleMapsLoader';
+import { reverseGeocode, getCurrentLocation } from '../../utils/geocoding';
+import './MapPicker.css';
+
+function MapPicker({ onLocationSelect, initialLocation }) {
+    console.log('🗺️ MapPicker component rendered!', { onLocationSelect, initialLocation });
+
+    const mapInstanceRef = useRef(null);
+    const markerRef = useRef(null);
+    const searchBoxRef = useRef(null);
+    const initializedRef = useRef(false);
+
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [selectedLocation, setSelectedLocation] = useState(initialLocation || null);
+    const [selectedAddress, setSelectedAddress] = useState('');
+    const [locationName, setLocationName] = useState('');
+    const [showConfirmPanel, setShowConfirmPanel] = useState(false);
+    const [geocoding, setGeocoding] = useState(false);
+
+    // Use callback ref to initialize map when DOM element is ready
+    const mapRef = useCallback((element) => {
+        console.log('MapPicker: Callback ref triggered', element, initializedRef.current);
+        if (element && !initializedRef.current) {
+            initializedRef.current = true;
+            initializeMap(element);
+        }
+    }, []);
+
+    const initializeMap = async (mapElement) => {
+        console.log('MapPicker: initializeMap called with element:', mapElement);
+        try {
+            setLoading(true);
+            setError(null);
+
+            // Load Google Maps API first
+            console.log('MapPicker: Loading Google Maps API...');
+            await loadGoogleMaps();
+            console.log('MapPicker: Google Maps API loaded successfully');
+
+            // Default center (can be user's location or a default city)
+            let center = { lat: 28.6139, lng: 77.2090 }; // Default: New Delhi, India
+
+            // Try to get user's current location
+            try {
+                console.log('MapPicker: Attempting to get current location...');
+                const userLocation = await getCurrentLocation();
+                center = userLocation;
+                console.log('MapPicker: Got user location:', center);
+            } catch (err) {
+                console.warn('Could not get user location:', err.message);
+                // Continue with default location
+            }
+
+            // Create map using the provided element
+            const map = new window.google.maps.Map(mapElement, {
+                center,
+                zoom: 15,
+                disableDefaultUI: false,
+                zoomControl: true,
+                mapTypeControl: false,
+                streetViewControl: false,
+                fullscreenControl: false,
+                gestureHandling: 'greedy',
+            });
+
+            mapInstanceRef.current = map;
+
+            // Create marker
+            const marker = new window.google.maps.Marker({
+                map,
+                position: center,
+                draggable: true,
+                animation: window.google.maps.Animation.DROP,
+            });
+
+            markerRef.current = marker;
+
+            // Update location when marker is dragged
+            marker.addListener('dragend', async () => {
+                const position = marker.getPosition();
+                const location = {
+                    lat: position.lat(),
+                    lng: position.lng(),
+                };
+                await handleLocationChange(location);
+            });
+
+            // Update location when map is clicked
+            map.addListener('click', async (e) => {
+                const location = {
+                    lat: e.latLng.lat(),
+                    lng: e.latLng.lng(),
+                };
+                marker.setPosition(e.latLng);
+                await handleLocationChange(location);
+            });
+
+            // Setup search box (only if input element is available)
+            if (searchBoxRef.current) {
+                const input = searchBoxRef.current;
+                const searchBox = new window.google.maps.places.SearchBox(input);
+
+                // Bias search results to current map viewport
+                map.addListener('bounds_changed', () => {
+                    searchBox.setBounds(map.getBounds());
+                });
+
+                // Handle place selection from search
+                searchBox.addListener('places_changed', () => {
+                    const places = searchBox.getPlaces();
+                    if (places.length === 0) return;
+
+                    const place = places[0];
+                    if (!place.geometry || !place.geometry.location) return;
+
+                    const location = {
+                        lat: place.geometry.location.lat(),
+                        lng: place.geometry.location.lng(),
+                    };
+
+                    // Update map and marker
+                    map.setCenter(place.geometry.location);
+                    marker.setPosition(place.geometry.location);
+
+                    // Zoom to place
+                    if (place.geometry.viewport) {
+                        map.fitBounds(place.geometry.viewport);
+                    } else {
+                        map.setZoom(17);
+                    }
+
+                    handleLocationChange(location);
+                });
+            }
+
+            // Set initial location if provided
+            if (initialLocation) {
+                setSelectedLocation(initialLocation);
+                map.setCenter(initialLocation);
+                marker.setPosition(initialLocation);
+                await reverseGeocodeLocation(initialLocation);
+                setShowConfirmPanel(true); // Show panel for initial location
+            }
+            // Don't show panel on initial load - only when user selects location
+
+            setLoading(false);
+            console.log('MapPicker: Map initialized successfully');
+        } catch (err) {
+            console.error('Failed to initialize map:', err);
+            console.error('Error details:', {
+                message: err.message,
+                stack: err.stack,
+                name: err.name
+            });
+            setError(err.message || 'Failed to load map. Please try again.');
+            setLoading(false);
+        }
+    };
+
+    const handleLocationChange = async (location) => {
+        setSelectedLocation(location);
+        setShowConfirmPanel(true);
+        await reverseGeocodeLocation(location);
+    };
+
+    const reverseGeocodeLocation = async (location) => {
+        try {
+            setGeocoding(true);
+            const addressData = await reverseGeocode(location.lat, location.lng);
+            setSelectedAddress(addressData.formattedAddress);
+        } catch (err) {
+            console.error('Geocoding failed:', err);
+            setSelectedAddress('Unable to fetch address');
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    const handleCurrentLocation = async () => {
+        try {
+            setGeocoding(true);
+            const location = await getCurrentLocation();
+
+            // Update map and marker
+            mapInstanceRef.current.setCenter(location);
+            mapInstanceRef.current.setZoom(17);
+            markerRef.current.setPosition(location);
+
+            await handleLocationChange(location);
+        } catch (err) {
+            alert(err.message || 'Failed to get your location. Please enable location permissions.');
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    const handleConfirm = async () => {
+        if (!selectedLocation || !locationName.trim()) {
+            alert('Please enter a name for this location (e.g., Home, Office)');
+            return;
+        }
+
+        try {
+            setGeocoding(true);
+            const addressData = await reverseGeocode(
+                selectedLocation.lat,
+                selectedLocation.lng
+            );
+            // Add location name to the address data
+            addressData.locationName = locationName.trim();
+            onLocationSelect(addressData);
+        } catch (err) {
+            alert('Failed to fetch address details. Please try again.');
+        } finally {
+            setGeocoding(false);
+        }
+    };
+
+    // Don't return early - always render the map div so ref can attach
+
+    return (
+        <div className="map-picker-container">
+            {/* Loading Overlay */}
+            {loading && (
+                <div className="map-loading">
+                    <div className="map-loading-spinner"></div>
+                    <p className="map-loading-text">Loading map...</p>
+                </div>
+            )}
+
+            {/* Error Overlay */}
+            {error && (
+                <div className="map-error">
+                    <AlertCircle size={48} className="map-error-icon" />
+                    <p className="map-error-message">{error}</p>
+                    <p className="map-error-hint">
+                        Make sure you have added VITE_GOOGLE_MAPS_API_KEY to your .env file
+                    </p>
+                </div>
+            )}
+
+            {/* Search Box */}
+            <div className="map-search-box">
+                <input
+                    ref={searchBoxRef}
+                    type="text"
+                    placeholder="Search for a location..."
+                    className="map-search-input"
+                />
+            </div>
+
+            {/* Current Location Button - More Prominent */}
+            <button
+                className="current-location-btn"
+                onClick={handleCurrentLocation}
+                disabled={geocoding}
+            >
+                <Navigation size={20} />
+                Use Current Location
+            </button>
+
+            {/* Map Canvas */}
+            <div ref={mapRef} className="map-canvas"></div>
+
+            {/* Modern Confirmation Panel */}
+            {showConfirmPanel && selectedAddress && (
+                <div className="map-confirm-panel">
+                    <div className="confirm-panel-header">
+                        <MapPin size={20} className="header-icon" />
+                        <h3>Confirm Your Location</h3>
+                        <button
+                            className="panel-close-btn"
+                            onClick={() => setShowConfirmPanel(false)}
+                            aria-label="Close"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="confirm-panel-content">
+                        {/* Address Display */}
+                        <div className="address-display">
+                            <label className="address-label">Detected Address</label>
+                            <p className="address-text">
+                                {geocoding ? (
+                                    <span className="loading-text">
+                                        <div className="mini-spinner"></div>
+                                        Fetching address...
+                                    </span>
+                                ) : (
+                                    selectedAddress
+                                )}
+                            </p>
+                        </div>
+
+                        {/* Location Name Input */}
+                        <div className="location-name-input">
+                            <label htmlFor="location-name">
+                                Save as <span className="required">*</span>
+                            </label>
+                            <input
+                                id="location-name"
+                                type="text"
+                                placeholder="e.g., Home, Office, Gym"
+                                value={locationName}
+                                onChange={(e) => setLocationName(e.target.value)}
+                                className="name-input"
+                            />
+                            <p className="input-hint">Give this location a memorable name</p>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="confirm-panel-actions">
+                            <button
+                                className="btn-cancel"
+                                onClick={() => setShowConfirmPanel(false)}
+                            >
+                                Change Location
+                            </button>
+                            <button
+                                className="btn-confirm"
+                                onClick={handleConfirm}
+                                disabled={!locationName.trim() || geocoding}
+                            >
+                                <Check size={18} />
+                                Confirm & Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default MapPicker;
