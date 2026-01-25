@@ -16,6 +16,7 @@ import CheckoutPage from './pages/CheckoutPage';
 import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import MyOrdersPage from './pages/MyOrdersPage';
+import OrderDetailPage from './pages/OrderDetailPage';
 import './index.css';
 
 /**
@@ -84,6 +85,14 @@ function App() {
                             element={
                               <ProtectedRoute>
                                 <MyOrdersPage />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/orders/:orderId"
+                            element={
+                              <ProtectedRoute>
+                                <OrderDetailPage />
                               </ProtectedRoute>
                             }
                           />

@@ -16,7 +16,9 @@ import {
     Plus,
     Share2,
     Package,
-    Info
+    Info,
+    Eye,
+    ShoppingBag
 } from 'lucide-react';
 import Button from '../components/common/Button';
 import { ConditionBadge } from '../components/common/Badge';
@@ -266,6 +268,18 @@ function ProductDetailPage() {
                             ))}
                         </div>
                     )}
+
+                    {/* Product Stats (Views/Sales) - Mobile Only */}
+                    <div className="product-stats mobile-only">
+                        <div className="stat-item">
+                            <Eye size={16} />
+                            <span>{product.views || 0} views</span>
+                        </div>
+                        <div className="stat-item">
+                            <ShoppingBag size={16} />
+                            <span>{product.soldCount || 0} sold</span>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Product Info */}
@@ -276,10 +290,33 @@ function ProductDetailPage() {
                             <span className="product-brand">{product.brand}</span>
                         )}
                         <h1 className="product-title">{product.name}</h1>
-                        {(product.partNumber || product.sku) && (
-                            <span className="product-sku">
-                                {product.partNumber ? `Part #: ${product.partNumber}` : `SKU: ${product.sku}`}
-                            </span>
+
+                        <div className="product-meta">
+                            {(product.partNumber || product.sku) && (
+                                <span className="product-sku">
+                                    {product.partNumber ? `Part #: ${product.partNumber}` : `SKU: ${product.sku}`}
+                                </span>
+                            )}
+                            <div className="product-stats desktop-only">
+                                <span className="stat-separator">•</span>
+                                <div className="stat-item">
+                                    <Eye size={14} />
+                                    <span>{product.views || 0} views</span>
+                                </div>
+                                <span className="stat-separator">•</span>
+                                <div className="stat-item">
+                                    <ShoppingBag size={14} />
+                                    <span>{product.soldCount || 0} sold</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {product.tags && product.tags.length > 0 && (
+                            <div className="product-tags">
+                                {product.tags.map((tag, index) => (
+                                    <span key={index} className="tag-badge">{tag}</span>
+                                ))}
+                            </div>
                         )}
                     </div>
 
@@ -293,26 +330,6 @@ function ProductDetailPage() {
                             : 'Out of Stock'
                         }
                     </div>
-
-                    {/* Compatible Vehicles */}
-                    {compatibleVehicles.length > 0 && (
-                        <div className="compatible-vehicles">
-                            <h4>Compatible Vehicles</h4>
-                            <ul>
-                                {compatibleVehicles.slice(0, 3).map((v, i) => (
-                                    <li key={i}>
-                                        <Check size={14} />
-                                        {v}
-                                    </li>
-                                ))}
-                                {compatibleVehicles.length > 3 && (
-                                    <li className="more">
-                                        +{compatibleVehicles.length - 3} more vehicles
-                                    </li>
-                                )}
-                            </ul>
-                        </div>
-                    )}
 
                     {/* Price */}
                     <div className="product-price-section">
@@ -452,11 +469,39 @@ function ProductDetailPage() {
                         </div>
                     </div>
 
+                    {/* Features */}
+                    {product.features && product.features.length > 0 && (
+                        <div className="product-features">
+                            <h3>Features</h3>
+                            <ul>
+                                {product.features.map((feature, index) => (
+                                    <li key={index}>
+                                        <Check size={16} className="feature-icon" />
+                                        <span>{feature}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {/* Description */}
                     {product.description && (
                         <div className="product-description">
                             <h3>Description</h3>
                             <p>{product.description}</p>
+                        </div>
+                    )}
+
+                    {/* Remarks / Additional Notes */}
+                    {product.remarks && (
+                        <div className="product-remarks">
+                            <div className="remarks-header">
+                                <Info size={18} />
+                                <h3>Additional Notes</h3>
+                            </div>
+                            <div className="remarks-content">
+                                <p>{product.remarks}</p>
+                            </div>
                         </div>
                     )}
 
@@ -500,24 +545,23 @@ function ProductDetailPage() {
                         </div>
                     )}
 
-                    {/* Seller Info */}
-                    {product.seller && (
-                        <div className="seller-info">
-                            <h3>Seller Information</h3>
-                            <div className="seller-card">
-                                <div className="seller-details">
-                                    <span className="seller-name">{product.seller.name}</span>
-                                    {product.seller.rating && (
-                                        <div className="seller-rating">
-                                            <Star size={14} fill="currentColor" />
-                                            <span>{product.seller.rating.toFixed(1)}</span>
-                                        </div>
-                                    )}
-                                </div>
-                                {product.seller.totalSales && (
-                                    <span className="seller-sales">{product.seller.totalSales} sales</span>
+                    {/* Compatible Vehicles */}
+                    {compatibleVehicles.length > 0 && (
+                        <div className="compatible-vehicles">
+                            <h4>Compatible Vehicles</h4>
+                            <ul>
+                                {compatibleVehicles.slice(0, 3).map((v, i) => (
+                                    <li key={i}>
+                                        <Check size={14} />
+                                        {v}
+                                    </li>
+                                ))}
+                                {compatibleVehicles.length > 3 && (
+                                    <li className="more">
+                                        +{compatibleVehicles.length - 3} more vehicles
+                                    </li>
                                 )}
-                            </div>
+                            </ul>
                         </div>
                     )}
                 </div>

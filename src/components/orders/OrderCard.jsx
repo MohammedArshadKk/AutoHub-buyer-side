@@ -20,7 +20,7 @@ const OrderCard = ({ order }) => {
     const totalItems = order.items.reduce((acc, item) => acc + item.quantity, 0);
 
     return (
-        <div className="order-card" onClick={() => navigate(`/order-success`, { state: { orderId: order._id } })}>
+        <div className="order-card" onClick={() => navigate(`/orders/${order._id}`)}>
             <div className="order-card-header">
                 <div className="order-info">
                     <span className="order-number">Order #{order.orderNumber}</span>

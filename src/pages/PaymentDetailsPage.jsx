@@ -14,12 +14,9 @@ function PaymentDetailsPage() {
     const { items, getTotalPrice, clearCart } = useCartStore();
 
     const [selectedAddress, setSelectedAddress] = useState(null);
-    const [paymentMethod, setPaymentMethod] = useState('online');
+    const [paymentMethod, setPaymentMethod] = useState('cod');
     const [loading, setLoading] = useState(true);
     const [orderLoading, setOrderLoading] = useState(false);
-    const [loadingStep, setLoadingStep] = useState('');
-    const [paymentError, setPaymentError] = useState(null);
-    const [showErrorModal, setShowErrorModal] = useState(false);
 
     // Get addressId from navigation state
     const addressId = location.state?.addressId;
@@ -114,8 +111,12 @@ function PaymentDetailsPage() {
                 }
             };
 
+            // Debug: Check phone format
+            console.log('📞 Phone being sent:', orderData.shippingAddress.phone);
+            console.log('📞 Phone length:', orderData.shippingAddress.phone?.length);
+            console.log('📞 Selected address:', selectedAddress);
+
             if (paymentMethod === 'cod') {
-                setLoadingStep('Creating your order...');
                 // ========== COD FLOW ==========
                 const order = await orderService.createOrder({
                     ...orderData,
@@ -139,17 +140,12 @@ function PaymentDetailsPage() {
                 // ========== ONLINE PAYMENT FLOW ==========
 
                 // 1. Create order in DB (before payment)
-                setLoadingStep('Creating order...');
                 const order = await orderService.createOrderForPayment(orderData);
 
                 // 2. Initiate Razorpay payment
-                setLoadingStep('Preparing payment gateway...');
                 const paymentData = await orderService.initiatePayment(order._id);
 
                 // 3. Open Razorpay checkout modal
-                setLoadingStep('Opening payment...');
-                setOrderLoading(false); // Hide loading overlay for Razorpay modal
-
                 const paymentResponse = await paymentService.openCheckout({
                     order_id: paymentData.razorpayOrderId,
                     amount: paymentData.amount,
@@ -172,8 +168,6 @@ function PaymentDetailsPage() {
                 });
 
                 // 4. Verify payment and update order
-                setOrderLoading(true); // Show loading again
-                setLoadingStep('Verifying payment...');
                 const updatedOrder = await orderService.verifyPayment(
                     order._id,
                     paymentResponse
@@ -205,23 +199,14 @@ function PaymentDetailsPage() {
             }
 
             // Handle payment cancellation
-            if (err.message === 'Payment cancelled by user' || err.message === 'Payment cancelled') {
-                alert('Payment was cancelled. Your order has been saved. You can retry payment from My Orders page.');
+            if (err.message === 'Payment cancelled by user') {
+                alert('Payment was cancelled. Your order has been saved and you can retry payment from My Orders page.');
                 return;
             }
 
-            // Handle Razorpay payment failures with detailed error
-            if (err.code || err.error || (err.message && err.message.includes('Payment'))) {
-                setPaymentError({
-                    code: err.code || err.error?.code || 'PAYMENT_FAILED',
-                    message: err.message || err.description || err.error?.description || 'Payment could not be completed',
-                    reason: err.reason || err.error?.reason || 'Unknown',
-                    method: paymentMethod,
-                    amount: pricing.grandTotal,
-                    timestamp: new Date().toISOString(),
-                    details: err
-                });
-                setShowErrorModal(true);
+            // Handle Razorpay payment failures
+            if (err.code) {
+                alert(`Payment failed: ${err.message || 'Please try again'}`);
                 return;
             }
 
@@ -229,7 +214,6 @@ function PaymentDetailsPage() {
             alert(err.message || 'Failed to place order. Please try again.');
         } finally {
             setOrderLoading(false);
-            setLoadingStep('');
         }
     };
 
@@ -289,6 +273,33 @@ function PaymentDetailsPage() {
                             </div>
                         </div>
 
+                        {/* Order Items */}
+                        <div className="section-card">
+                            <div className="section-header">
+                                <Package size={20} />
+                                <h2>Order Items ({items.length})</h2>
+                            </div>
+                            <div className="order-items">
+                                {items.map((item) => (
+                                    <div key={item._id} className="order-item">
+                                        <img
+                                            src={item.images?.[0] || '/placeholder-product.png'}
+                                            alt={item.name}
+                                            className="item-image"
+                                        />
+                                        <div className="item-details">
+                                            <h3 className="item-name">{item.name}</h3>
+                                            <p className="item-quantity">Quantity: {item.quantity}</p>
+                                        </div>
+                                        <div className="item-pricing">
+                                            <p className="item-price">₹{item.price.toLocaleString('en-IN')}</p>
+                                            <p className="item-total">₹{(item.price * item.quantity).toLocaleString('en-IN')}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Payment Method */}
                         <div className="section-card">
                             <div className="section-header">
@@ -328,33 +339,6 @@ function PaymentDetailsPage() {
                                         </div>
                                     </div>
                                 </label>
-                            </div>
-                        </div>
-
-                        {/* Order Items */}
-                        <div className="section-card">
-                            <div className="section-header">
-                                <Package size={20} />
-                                <h2>Order Items ({items.length})</h2>
-                            </div>
-                            <div className="order-items">
-                                {items.map((item) => (
-                                    <div key={item._id} className="order-item">
-                                        <img
-                                            src={item.images?.[0] || '/placeholder-product.png'}
-                                            alt={item.name}
-                                            className="item-image"
-                                        />
-                                        <div className="item-details">
-                                            <h3 className="item-name">{item.name}</h3>
-                                            <p className="item-quantity">Quantity: {item.quantity}</p>
-                                        </div>
-                                        <div className="item-pricing">
-                                            <p className="item-price">₹{item.price.toLocaleString('en-IN')}</p>
-                                            <p className="item-total">₹{(item.price * item.quantity).toLocaleString('en-IN')}</p>
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
                         </div>
                     </div>
@@ -416,91 +400,6 @@ function PaymentDetailsPage() {
                     </div>
                 </div>
             </div>
-            {/* Loading Overlay */}
-            {orderLoading && (
-                <div className="loading-overlay">
-                    <div className="loading-content">
-                        <div className="loading-spinner-large"></div>
-                        <p className="loading-text">{loadingStep || 'Processing...'}</p>
-                        <p className="loading-subtext">Please do not close this window</p>
-                    </div>
-                </div>
-            )}
-
-            {/* Payment Error Modal */}
-            {showErrorModal && paymentError && (
-                <div className="payment-error-modal-overlay" onClick={() => setShowErrorModal(false)}>
-                    <div className="payment-error-modal" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header error">
-                            <h2>❌ Payment Failed</h2>
-                        </div>
-
-                        <div className="modal-body">
-                            <div className="error-summary">
-                                <h3>{paymentError.message}</h3>
-                                <p className="error-reason">Reason: {paymentError.reason}</p>
-                            </div>
-
-                            <div className="error-details">
-                                <h4>Transaction Details:</h4>
-                                <div className="detail-grid">
-                                    <div className="detail-item">
-                                        <span className="detail-label">Error Code:</span>
-                                        <span className="detail-value">{paymentError.code}</span>
-                                    </div>
-                                    <div className="detail-item">
-                                        <span className="detail-label">Payment Method:</span>
-                                        <span className="detail-value">{paymentError.method === 'online' ? 'Online Payment' : 'Cash on Delivery'}</span>
-                                    </div>
-                                    <div className="detail-item">
-                                        <span className="detail-label">Amount:</span>
-                                        <span className="detail-value">₹{paymentError.amount?.toLocaleString('en-IN')}</span>
-                                    </div>
-                                    <div className="detail-item">
-                                        <span className="detail-label">Timestamp:</span>
-                                        <span className="detail-value">{new Date(paymentError.timestamp).toLocaleString()}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="error-help">
-                                <p><strong>What happened?</strong></p>
-                                <p>Your payment could not be processed. Don't worry, your order has been saved and no money has been deducted.</p>
-
-                                <p className="mt-3"><strong>What you can do:</strong></p>
-                                <ul>
-                                    <li>Try a different payment method</li>
-                                    <li>Check your card/account balance</li>
-                                    <li>Contact your bank if the issue persists</li>
-                                    <li>Retry payment from My Orders page</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div className="modal-footer">
-                            <Button
-                                variant="secondary"
-                                onClick={() => {
-                                    setShowErrorModal(false);
-                                    setPaymentError(null);
-                                }}
-                            >
-                                Close
-                            </Button>
-                            <Button
-                                variant="primary"
-                                onClick={() => {
-                                    setShowErrorModal(false);
-                                    setPaymentError(null);
-                                    // User can try placing order again
-                                }}
-                            >
-                                Try Again
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
