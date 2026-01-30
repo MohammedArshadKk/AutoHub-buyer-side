@@ -9,10 +9,10 @@ import {
     MapPin,
     FileText,
     HelpCircle,
-    RotateCcw
+    RotateCcw,
+    Store
 } from 'lucide-react';
 import orderService from '../services/orderService';
-import OrderStatusBadge from '../components/orders/OrderStatusBadge';
 import Button from '../components/common/Button';
 import './OrderDetailPage.css';
 
@@ -55,19 +55,31 @@ const OrderDetailPage = () => {
         );
     }
 
-    // Timeline Steps Logic
+    // Dynamic Timeline using statusHistory
+    // Mapping internal statuses to display steps
+    const timelineEvents = order.statusHistory || [];
+
+    // Helper to find date for a specific status
+    const getDateForStatus = (status) => {
+        const event = timelineEvents.find(e => e.status === status);
+        return event ? event.timestamp : null;
+    };
+
+    // Define standard flow steps
     const steps = [
-        { id: 'placed', label: 'Order Placed', icon: Box, date: order.orderedAt },
-        { id: 'processing', label: 'Processing', icon: Package, date: order.createdAt }, // Fallback to createdAt
-        { id: 'shipped', label: 'Shipped', icon: Truck, date: order.shippedAt },
-        { id: 'delivered', label: 'Delivered', icon: CheckCircle, date: order.deliveredAt }
+        { id: 'pending', label: 'Order Placed', icon: Box, date: getDateForStatus('pending') || order.orderedAt },
+        { id: 'processing', label: 'Processing', icon: Package, date: getDateForStatus('processing') },
+        { id: 'shipped', label: 'Shipped', icon: Truck, date: getDateForStatus('shipped') },
+        { id: 'delivered', label: 'Delivered', icon: CheckCircle, date: getDateForStatus('delivered') }
     ];
 
     const getCurrentStepIndex = () => {
         const status = order.orderStatus.toLowerCase();
         if (status === 'delivered') return 4;
+        if (status === 'out_for_delivery') return 3; // Highlight shipped step fully or maybe add a step? For now 3.5 ish but let's say 3
         if (status === 'shipped') return 3;
-        if (status === 'processing' || status === 'confirmed') return 2;
+        if (status === 'processing') return 2;
+        if (status === 'confirmed') return 2;
         return 1;
     };
 
@@ -82,6 +94,14 @@ const OrderDetailPage = () => {
                         <ArrowLeft size={20} />
                         Back to Orders
                     </button>
+                    <div className="od-seller-info">
+                        {order.sellerDetails?.businessName && (
+                            <span className="seller-badge">
+                                <Store size={14} />
+                                Sold by {order.sellerDetails.businessName}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Title Section */}
@@ -89,10 +109,12 @@ const OrderDetailPage = () => {
                     <div>
                         <h1 className="od-title">Order #{order.orderNumber}</h1>
                         <p className="od-date">
-                            Placed on {new Date(order.orderedAt).toLocaleDateString('en-US', {
+                            Placed on {new Date(order.orderedAt).toLocaleString('en-US', {
                                 year: 'numeric',
                                 month: 'long',
-                                day: 'numeric'
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
                             })}
                         </p>
                     </div>
@@ -124,7 +146,9 @@ const OrderDetailPage = () => {
                                 <div className="timeline-steps">
                                     {steps.map((step, index) => {
                                         const isActive = index < currentStep;
-                                        const isCompleted = index < currentStep - 1;
+                                        // Specific check for Cancelled state to show red? 
+                                        // For now keeping simple green progress
+
                                         const Icon = step.icon;
 
                                         return (
@@ -146,18 +170,23 @@ const OrderDetailPage = () => {
                                 </div>
                             </div>
 
-                            {/* Detailed Activity Mockup (Static for now, can be dynamic later) */}
-                            {currentStep < 4 && order.orderStatus !== 'cancelled' && (
-                                <div className="delivery-estimate">
-                                    <div className="estimate-icon">
-                                        <Truck size={24} />
-                                    </div>
-                                    <div>
-                                        <strong>On the way</strong>
-                                        <p>Your package is being processed and will be shipped soon.</p>
-                                    </div>
+                            {/* Detailed Status History Log */}
+                            <div className="status-history-log mt-6 pt-4 border-t border-gray-100">
+                                <h3 className="text-sm font-semibold mb-3">Activity Log</h3>
+                                <div className="space-y-3">
+                                    {order.statusHistory?.slice().reverse().map((event, idx) => (
+                                        <div key={idx} className="flex gap-3 text-sm">
+                                            <div className="text-gray-500 min-w-[120px]">
+                                                {new Date(event.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                            <div>
+                                                <span className="font-medium capitalize text-gray-800">{event.status.replace(/_/g, ' ')}</span>
+                                                {event.note && <span className="text-gray-500 block text-xs">"{event.note}"</span>}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
 
                         {/* Shipping Address */}
@@ -220,12 +249,20 @@ const OrderDetailPage = () => {
                                 </div>
                             </div>
 
-                            <div className="od-actions-footer">
-                                <Button variant="secondary" className="full-width">
-                                    <RotateCcw size={16} />
-                                    Return Items
-                                </Button>
-                            </div>
+                            {order.orderStatus === 'pending' || order.orderStatus === 'confirmed' ? (
+                                <div className="od-actions-footer">
+                                    <Button variant="danger" className="full-width" onClick={() => {/* Cancel logic */ }}>
+                                        Cancel Order
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="od-actions-footer">
+                                    <Button variant="secondary" className="full-width">
+                                        <RotateCcw size={16} />
+                                        Return Items
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

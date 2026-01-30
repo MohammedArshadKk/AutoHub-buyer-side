@@ -11,19 +11,22 @@ function OrderSuccessPage() {
     const {
         orderId,
         orderNumber,
+        orderNumbers, // For split orders
         totalAmount,
         paymentMethod,
         paymentId
     } = location.state || {};
 
+    const displayOrderNumber = orderNumber || (orderNumbers && orderNumbers.length > 0 ? orderNumbers[0] : null);
+
     useEffect(() => {
         // Redirect if no order data
-        if (!orderId || !orderNumber) {
+        if (!orderId || !displayOrderNumber) {
             navigate('/');
         }
-    }, [orderId, orderNumber, navigate]);
+    }, [orderId, displayOrderNumber, navigate]);
 
-    if (!orderId || !orderNumber) {
+    if (!orderId || !displayOrderNumber) {
         return null;
     }
 
@@ -45,8 +48,13 @@ function OrderSuccessPage() {
                     {/* Order Details */}
                     <div className="order-details-card">
                         <div className="detail-row">
-                            <span className="detail-label">Order Number:</span>
-                            <span className="detail-value order-number">#{orderNumber}</span>
+                            <span className="detail-label">{orderNumbers && orderNumbers.length > 1 ? 'Order Numbers:' : 'Order Number:'}</span>
+                            <span className="detail-value order-number">
+                                {orderNumbers && orderNumbers.length > 1
+                                    ? orderNumbers.map(n => `#${n}`).join(', ')
+                                    : `#${displayOrderNumber}`
+                                }
+                            </span>
                         </div>
 
                         <div className="detail-row">

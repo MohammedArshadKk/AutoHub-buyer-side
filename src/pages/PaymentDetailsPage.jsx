@@ -118,7 +118,7 @@ function PaymentDetailsPage() {
 
             if (paymentMethod === 'cod') {
                 // ========== COD FLOW ==========
-                const order = await orderService.createOrder({
+                const response = await orderService.createOrder({
                     ...orderData,
                     paymentMethod: 'cod'
                 });
@@ -126,12 +126,15 @@ function PaymentDetailsPage() {
                 // Clear cart
                 clearCart();
 
-                // Navigate to success page
+                // Navigate to success page - if split, we show the first one or a general success
+                const firstOrder = response.orders[0];
                 navigate('/order-success', {
                     state: {
-                        orderId: order._id,
-                        orderNumber: order.orderNumber,
-                        totalAmount: order.totalAmount,
+                        orderId: firstOrder._id,
+                        orderNumber: firstOrder.orderNumber,
+                        totalAmount: pricing.grandTotal,
+                        orders: response.orders,
+                        isSplitOrder: response.isSplitOrder,
                         paymentMethod: 'cod'
                     }
                 });
@@ -140,50 +143,46 @@ function PaymentDetailsPage() {
                 // ========== ONLINE PAYMENT FLOW ==========
 
                 // 1. Create order in DB (before payment)
-                const order = await orderService.createOrderForPayment(orderData);
+                const paymentInfo = await orderService.createOrderForPayment(orderData);
 
-                // 2. Initiate Razorpay payment
-                const paymentData = await orderService.initiatePayment(order._id);
-
-                // 3. Open Razorpay checkout modal
+                // 2. Open Razorpay checkout modal 
+                // Note: No need for separate initiatePayment as createOrderForPayment provides all details
                 const paymentResponse = await paymentService.openCheckout({
-                    order_id: paymentData.razorpayOrderId,
-                    amount: paymentData.amount,
-                    currency: paymentData.currency,
+                    order_id: paymentInfo.razorpayOrderId,
+                    amount: paymentInfo.totalAmount,
+                    currency: 'INR',
                     name: 'Auto Hub',
-                    description: `Order ${order.orderNumber}`,
-                    image: '/logo.png', // Your logo
+                    description: `Order Payment (${paymentInfo.count} orders)`,
+                    image: '/logo.png',
                     prefill: {
                         name: selectedAddress.fullName,
                         contact: selectedAddress.phone,
-                        email: '' // Add if you collect email
                     },
                     notes: {
-                        orderId: order._id,
-                        orderNumber: order.orderNumber
+                        orderIds: paymentInfo.orderIds.join(','),
                     },
                     theme: {
                         color: '#2563eb'
                     }
                 });
 
-                // 4. Verify payment and update order
-                const updatedOrder = await orderService.verifyPayment(
-                    order._id,
+                // 3. Verify payment and update order
+                const verifyResult = await orderService.verifyPayment(
+                    null, // orderId not needed in new verify endpoint
                     paymentResponse
                 );
 
-                // 5. Clear cart
+                // 4. Clear cart
                 clearCart();
 
-                // 6. Navigate to success page
+                // 5. Navigate to success page
                 navigate('/order-success', {
                     state: {
-                        orderId: updatedOrder._id,
-                        orderNumber: updatedOrder.orderNumber,
-                        totalAmount: order.totalAmount,
+                        orderId: paymentInfo.orderIds[0],
+                        orderNumbers: verifyResult.orderNumbers,
+                        totalAmount: paymentInfo.totalAmount,
                         paymentMethod: 'online',
-                        paymentId: updatedOrder.razorpayPaymentId
+                        paymentId: paymentResponse.razorpay_payment_id
                     }
                 });
             }

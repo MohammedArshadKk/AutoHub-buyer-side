@@ -10,7 +10,8 @@ const orderService = {
                 method: 'POST',
                 body: JSON.stringify(orderData),
             });
-            return data.data.order;
+            // Returns { orders, isSplitOrder }
+            return data.data;
         } catch (error) {
             console.error('Order creation failed:', error);
             throw error;
@@ -24,7 +25,8 @@ const orderService = {
                 method: 'POST',
                 body: JSON.stringify(orderData),
             });
-            return data.data.order;
+            // Returns { razorpayOrderId, totalAmount, orderIds, count ... }
+            return data.data;
         } catch (error) {
             console.error('Order creation for payment failed:', error);
             throw error;
@@ -47,7 +49,7 @@ const orderService = {
     // Verify payment and update order
     verifyPayment: async (orderId, paymentResponse) => {
         try {
-            const data = await fetchWithCredentials(`${API_URL}/orders/${orderId}/payment/verify`, {
+            const data = await fetchWithCredentials(`${API_URL}/orders/payment/verify`, {
                 method: 'POST',
                 body: JSON.stringify({
                     razorpayOrderId: paymentResponse.razorpay_order_id,
@@ -55,7 +57,8 @@ const orderService = {
                     razorpaySignature: paymentResponse.razorpay_signature,
                 }),
             });
-            return data.data.order;
+            // Returns { ordersCount, orderNumbers }
+            return data.data;
         } catch (error) {
             console.error('Payment verification failed:', error);
             throw error;
