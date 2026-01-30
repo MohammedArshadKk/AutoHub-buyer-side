@@ -99,6 +99,20 @@ const orderService = {
             throw error;
         }
     },
+
+    // Synchronize payment status with backend (manual retry)
+    syncPayment: async (razorpayOrderId) => {
+        try {
+            const data = await fetchWithCredentials(`${API_URL}/orders/payment/sync`, {
+                method: 'POST',
+                body: JSON.stringify({ razorpayOrderId }),
+            });
+            return data.data;
+        } catch (error) {
+            console.error('Payment synchronization failed:', error);
+            throw error;
+        }
+    },
 };
 
 export default orderService;

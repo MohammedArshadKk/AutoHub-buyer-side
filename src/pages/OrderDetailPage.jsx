@@ -26,6 +26,14 @@ const OrderDetailPage = () => {
         fetchOrderDetails();
     }, [orderId]);
 
+    // Auto-sync payment status if pending
+    useEffect(() => {
+        if (order && order.orderStatus === 'payment_pending' && order.razorpayOrderId) {
+            console.log('🔄 Order in payment_pending, auto-synchronizing...');
+            handleSyncPayment(true); // Silent sync
+        }
+    }, [order?.orderStatus]);
+
     const fetchOrderDetails = async () => {
         try {
             setLoading(true);
@@ -35,6 +43,26 @@ const OrderDetailPage = () => {
             console.error('Failed to load order:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const [syncLoading, setSyncLoading] = useState(false);
+    const handleSyncPayment = async (silent = false) => {
+        if (!order?.razorpayOrderId) return;
+        try {
+            if (!silent) setSyncLoading(true);
+            const result = await orderService.syncPayment(order.razorpayOrderId);
+            if (result.status === 'success') {
+                if (!silent) alert('Payment verified successfully!');
+                fetchOrderDetails();
+            } else {
+                if (!silent) alert(result.message || 'No successful payment found yet.');
+            }
+        } catch (error) {
+            console.error('Sync failed:', error);
+            if (!silent) alert('Failed to synchronize payment. Please try again later.');
+        } finally {
+            if (!silent) setSyncLoading(false);
         }
     };
 
@@ -249,7 +277,35 @@ const OrderDetailPage = () => {
                                 </div>
                             </div>
 
-                            {order.orderStatus === 'pending' || order.orderStatus === 'confirmed' ? (
+                            {order.orderStatus === 'payment_pending' ? (
+                                <div className="od-actions-footer space-y-2">
+                                    <Button
+                                        variant="primary"
+                                        className="full-width"
+                                        onClick={handleSyncPayment}
+                                        disabled={syncLoading}
+                                    >
+                                        {syncLoading ? 'Checking...' : 'Verify Payment Status'}
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        className="full-width"
+                                        onClick={() => navigate('/payment', { state: { addressId: order.shippingAddress?._id || 'retry' } })}
+                                    >
+                                        Retry Payment
+                                    </Button>
+                                </div>
+                            ) : order.orderStatus === 'payment_failed' ? (
+                                <div className="od-actions-footer">
+                                    <Button
+                                        variant="primary"
+                                        className="full-width"
+                                        onClick={() => navigate('/payment', { state: { addressId: 'retry' } })}
+                                    >
+                                        Retry Payment
+                                    </Button>
+                                </div>
+                            ) : order.orderStatus === 'pending' || order.orderStatus === 'confirmed' ? (
                                 <div className="od-actions-footer">
                                     <Button variant="danger" className="full-width" onClick={() => {/* Cancel logic */ }}>
                                         Cancel Order

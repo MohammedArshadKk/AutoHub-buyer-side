@@ -153,7 +153,7 @@ function PaymentDetailsPage() {
                     currency: 'INR',
                     name: 'Auto Hub',
                     description: `Order Payment (${paymentInfo.count} orders)`,
-                    image: '/logo.png',
+                    image: '', // Remove local logo to avoid CORS block by Razorpay
                     prefill: {
                         name: selectedAddress.fullName,
                         contact: selectedAddress.phone,
@@ -167,10 +167,21 @@ function PaymentDetailsPage() {
                 });
 
                 // 3. Verify payment and update order
-                const verifyResult = await orderService.verifyPayment(
-                    null, // orderId not needed in new verify endpoint
-                    paymentResponse
-                );
+                console.log('💳 Razorpay payment successful, verifying signature...', paymentResponse);
+
+                let verifyResult;
+                try {
+                    verifyResult = await orderService.verifyPayment(
+                        null, // orderId not needed in new verify endpoint
+                        paymentResponse
+                    );
+                } catch (verifyErr) {
+                    console.warn('⚠️ Signature verification failed locally, attempting server sync...', verifyErr);
+                    // Fallback: Try syncing directly with Razorpay API (useful for localhost/webhook issues)
+                    verifyResult = await orderService.syncPayment(paymentResponse.razorpay_order_id);
+                }
+
+                console.log('✅ Payment verified result:', verifyResult);
 
                 // 4. Clear cart
                 clearCart();
