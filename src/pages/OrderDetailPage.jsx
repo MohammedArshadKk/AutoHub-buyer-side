@@ -27,6 +27,7 @@ const OrderDetailPage = () => {
     const [cancellationReason, setCancellationReason] = useState('');
     const [cancelLoading, setCancelLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
+    const [downloadLoading, setDownloadLoading] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -88,6 +89,18 @@ const OrderDetailPage = () => {
             alert(error.message || 'Failed to cancel order');
         } finally {
             setCancelLoading(false);
+        }
+    };
+
+    const handleDownloadInvoice = async () => {
+        try {
+            setDownloadLoading(true);
+            await orderService.downloadInvoice(orderId);
+        } catch (error) {
+            console.error('Download failed:', error);
+            alert('Failed to download invoice');
+        } finally {
+            setDownloadLoading(false);
         }
     };
 
@@ -169,16 +182,7 @@ const OrderDetailPage = () => {
                             })}
                         </p>
                     </div>
-                    <div className="od-actions">
-                        <Button variant="outline" className="action-btn">
-                            <FileText size={16} />
-                            Invoice
-                        </Button>
-                        <Button variant="outline" className="action-btn">
-                            <HelpCircle size={16} />
-                            Need Help?
-                        </Button>
-                    </div>
+                    {/* Actions moved to sidebar for better stacking/alignment */}
                 </div>
 
                 <div className="od-content-grid">
@@ -275,6 +279,26 @@ const OrderDetailPage = () => {
 
                     {/* Right Column: Order Summary */}
                     <div className="od-sidebar">
+                        {/* Help & Support Card - Moved from Header */}
+                        <div className="od-card">
+                            <h2 className="od-section-title">Help & Support</h2>
+                            <div className="flex flex-col gap-3">
+                                <Button
+                                    variant="outline"
+                                    className="full-width justify-start"
+                                    onClick={handleDownloadInvoice}
+                                    disabled={downloadLoading}
+                                >
+                                    <FileText size={18} />
+                                    {downloadLoading ? 'Downloading...' : 'Download Invoice'}
+                                </Button>
+                                <Button variant="outline" className="full-width justify-start">
+                                    <HelpCircle size={18} />
+                                    Need Help?
+                                </Button>
+                            </div>
+                        </div>
+
                         <div className="od-card">
                             <h2 className="od-section-title">Order Summary</h2>
                             <p className="item-count">{order.items.length} Items</p>

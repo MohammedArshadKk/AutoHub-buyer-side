@@ -115,6 +115,44 @@ const orderService = {
             throw error;
         }
     },
+
+    // Download Invoice
+    downloadInvoice: async (orderId) => {
+        try {
+            // Use credentials: 'include' to send HTTP-only cookies
+            const response = await fetch(`${API_URL}/orders/${orderId}/invoice`, {
+                headers: {
+                    // 'Authorization': ... // Not needed, using cookies
+                },
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                // Try to parse JSON error if possible
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    throw new Error(errorJson.message || 'Failed to download invoice');
+                } catch (e) {
+                    throw new Error(errorText || 'Failed to download invoice');
+                }
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `invoice-${orderId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            return true;
+        } catch (error) {
+            console.error('Invoice download failed:', error);
+            throw error;
+        }
+    },
 };
 
 export default orderService;
