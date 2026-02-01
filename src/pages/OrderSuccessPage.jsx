@@ -1,34 +1,100 @@
-import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Package, CreditCard, ArrowRight } from 'lucide-react';
 import Button from '../components/common/Button';
+import orderService from '../services/orderService';
+import useCartStore from '../store/cartStore'; // Import Store
 import './OrderSuccessPage.css';
 
 function OrderSuccessPage() {
     const navigate = useNavigate();
     const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const [loading, setLoading] = useState(false);
+    const [orderDetails, setOrderDetails] = useState(null);
+    const { clearCart } = useCartStore(); // Use global store
+
+    // Get orderId from State OR URL (priority to state to avoid fetching if possible)
+    const stateOrderId = location.state?.orderId;
+    const urlOrderId = searchParams.get('orderId');
+    const shouldClearCart = searchParams.get('clear_cart') === 'true'; // Check flag
+    const effectiveOrderId = stateOrderId || urlOrderId;
+
+    useEffect(() => {
+        // Clear cart if flagged (e.g. from backend redirect)
+        if (shouldClearCart) {
+            clearCart();
+            // Optional: Remove param from URL to prevent re-clearing on refresh (though harmless)
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('clear_cart');
+            // We don't necessarily need to replace URL immediately, but it's cleaner.
+        }
+
+        // If we have state data, use it directly (no fetch needed)
+        if (location.state?.orderId) {
+            setOrderDetails(location.state);
+            return;
+        }
+
+        // If we have URL ID but no state, fetch the order
+        if (urlOrderId) {
+            fetchOrderDetails(urlOrderId);
+        } else {
+            // No ID at all
+            navigate('/');
+        }
+    }, [location.state, urlOrderId, navigate]);
+
+    const fetchOrderDetails = async (id) => {
+        try {
+            setLoading(true);
+            const order = await orderService.getOrderById(id);
+
+            if (!order) {
+                navigate('/'); // Or show error
+                return;
+            }
+
+            // Normalize data to match state structure
+            setOrderDetails({
+                orderId: order._id,
+                orderNumber: order.orderNumber,
+                totalAmount: order.totalAmount,
+                paymentMethod: order.paymentMethod,
+                paymentId: order.razorpayPaymentId, // If available
+                orderNumbers: [order.orderNumber] // Assuming single fetch for now
+            });
+
+        } catch (error) {
+            console.error("Failed to load order success details:", error);
+            navigate('/');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="order-success-page loading">
+                <div className="loading-spinner"></div>
+            </div>
+        );
+    }
+
+    if (!orderDetails) {
+        return null; // Or generic error
+    }
 
     const {
         orderId,
         orderNumber,
-        orderNumbers, // For split orders
+        orderNumbers,
         totalAmount,
         paymentMethod,
         paymentId
-    } = location.state || {};
+    } = orderDetails;
 
     const displayOrderNumber = orderNumber || (orderNumbers && orderNumbers.length > 0 ? orderNumbers[0] : null);
-
-    useEffect(() => {
-        // Redirect if no order data
-        if (!orderId || !displayOrderNumber) {
-            navigate('/');
-        }
-    }, [orderId, displayOrderNumber, navigate]);
-
-    if (!orderId || !displayOrderNumber) {
-        return null;
-    }
 
     return (
         <div className="order-success-page">

@@ -300,7 +300,23 @@ const OrderDetailPage = () => {
                                     <Button
                                         variant="primary"
                                         className="full-width"
-                                        onClick={() => navigate('/payment', { state: { addressId: 'retry' } })}
+                                        onClick={() => navigate('/payment', {
+                                            state: {
+                                                addressId: 'retry',
+                                                existingOrderId: order._id, // Signal retry mode
+                                                existingRazorpayOrderId: order.razorpayOrderId,
+                                                existingOrderNumber: order.orderNumber,
+                                                retryItems: order.items,
+                                                retryAddress: order.shippingAddress,
+                                                retryPricing: {
+                                                    subtotal: order.subtotal || order.totalAmount, // Fallback if subtotal missing
+                                                    shippingCharge: order.shippingCharge || 0,
+                                                    handlingCharge: 0, // Already part of total likely
+                                                    tax: 0,
+                                                    grandTotal: order.totalAmount
+                                                }
+                                            }
+                                        })}
                                     >
                                         Retry Payment
                                     </Button>

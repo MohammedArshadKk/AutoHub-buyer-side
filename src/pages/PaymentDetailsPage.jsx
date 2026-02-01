@@ -18,17 +18,38 @@ function PaymentDetailsPage() {
     const [loading, setLoading] = useState(true);
     const [orderLoading, setOrderLoading] = useState(false);
 
-    // Get addressId from navigation state
+    // Retry Mode detection
+    const isRetryMode = !!location.state?.existingOrderId;
+    const retryState = location.state || {};
+
+    // Get addressId from navigation state - RESTORED
     const addressId = location.state?.addressId;
 
     useEffect(() => {
-        // Redirect if no address selected or cart is empty
-        if (!addressId || items.length === 0) {
+        console.log("Retry Debug:", { isRetryMode, addressId, retryState, items });
+
+        // Redirect if no address selected or cart is empty (unless retrying)
+        if (!addressId || (items.length === 0 && !isRetryMode)) {
             navigate('/checkout');
             return;
         }
-        fetchAddress();
-    }, [addressId, items, navigate]);
+
+        if (isRetryMode || addressId === 'retry') {
+            // In retry mode, we don't fetch address from API, we use passed data
+            if (retryState.retryAddress) {
+                // Adapt format if needed
+                setSelectedAddress({
+                    ...retryState.retryAddress,
+                    _id: 'retry-address'
+                });
+                setLoading(false);
+            } else {
+                console.warn("Retry mode but no address provided in state");
+            }
+        } else {
+            fetchAddress();
+        }
+    }, [addressId, items, navigate, isRetryMode]);
 
     const fetchAddress = async () => {
         try {
@@ -62,6 +83,10 @@ function PaymentDetailsPage() {
 
     // Calculate pricing
     const calculatePricing = () => {
+        if (isRetryMode && retryState.retryPricing) {
+            return retryState.retryPricing;
+        }
+
         const subtotal = getTotalPrice();
         const shippingCharge = subtotal >= 1000 ? 0 : 50;
         const handlingCharge = 20;
@@ -117,6 +142,11 @@ function PaymentDetailsPage() {
             console.log('📞 Selected address:', selectedAddress);
 
             if (paymentMethod === 'cod') {
+                if (isRetryMode) {
+                    alert("COD update for existing orders is not supported yet.");
+                    return;
+                }
+
                 // ========== COD FLOW ==========
                 const response = await orderService.createOrder({
                     ...orderData,
@@ -141,18 +171,40 @@ function PaymentDetailsPage() {
 
             } else if (paymentMethod === 'online') {
                 // ========== ONLINE PAYMENT FLOW ==========
+                let paymentInfo;
 
-                // 1. Create order in DB (before payment)
-                const paymentInfo = await orderService.createOrderForPayment(orderData);
+                if (isRetryMode) {
+                    console.log("🔄 RETRY MODE: Using existing order details...");
+                    paymentInfo = {
+                        razorpayOrderId: retryState.existingRazorpayOrderId,
+                        totalAmount: retryState.retryPricing.grandTotal,
+                        count: 1, // Single order retry usually
+                        orderIds: [retryState.existingOrderId]
+                    };
+
+                    if (!paymentInfo.razorpayOrderId) {
+                        throw new Error("Missing Razorpay Order ID for retry. Please place a new order.");
+                    }
+
+                } else {
+                    // 1. Create order in DB (before payment)
+                    paymentInfo = await orderService.createOrderForPayment(orderData);
+                }
 
                 // 2. Open Razorpay checkout modal 
                 // Note: No need for separate initiatePayment as createOrderForPayment provides all details
                 const paymentResponse = await paymentService.openCheckout({
                     order_id: paymentInfo.razorpayOrderId,
-                    amount: paymentInfo.totalAmount,
+                    amount: paymentInfo.totalAmount, // Amount is already in paise from backend usually, but here pricing.grandTotal is rupees? 
+                    // WAIT: createOrderForPayment returns amount in PAISE. 
+                    // But if retryMode, we have pricing.grandTotal in RUPEES.
+                    // Need to ensure consistency.
+                    // Let's Convert URL state pricing (Rupees) -> Paise for Razorpay
+                    amount: isRetryMode ? Math.round(paymentInfo.totalAmount * 100) : paymentInfo.totalAmount,
+
                     currency: 'INR',
                     name: 'Auto Hub',
-                    description: `Order Payment (${paymentInfo.count} orders)`,
+                    description: isRetryMode ? `Retry Payment #${retryState.existingOrderNumber}` : `Order Payment (${paymentInfo.count} orders)`,
                     image: '', // Remove local logo to avoid CORS block by Razorpay
                     prefill: {
                         name: selectedAddress.fullName,
@@ -160,14 +212,27 @@ function PaymentDetailsPage() {
                     },
                     notes: {
                         orderIds: paymentInfo.orderIds.join(','),
+                        isRetry: isRetryMode
                     },
                     theme: {
                         color: '#2563eb'
+                    },
+                    // Add Callback URL for success/failure redirection
+                    callback_url: `${import.meta.env.VITE_API_URL}/orders/payment/callback`,
+                    redirect: true,
+                    retry: {
+                        enabled: true // standard retry logic
                     }
                 });
 
-                // 3. Verify payment and update order
-                console.log('💳 Razorpay payment successful, verifying signature...', paymentResponse);
+                // 3. Verify payment (Logic handled by backend callback, code below is fallback/initialization)
+                // Note: If callback_url works, the page redirects and this line is never reached on success.
+                // However, if the popup is closed without payment, the promise rejects and we hit the catch block.
+                console.log('💳 Razorpay opened...');
+
+                // We await purely to catch the 'modal dismissed' error.
+                // If payment succeeds, redirect happens.
+
 
                 let verifyResult;
                 try {
@@ -183,15 +248,21 @@ function PaymentDetailsPage() {
 
                 console.log('✅ Payment verified result:', verifyResult);
 
-                // 4. Clear cart
-                clearCart();
+                // 4. Clear cart ONLY if new order
+                if (!isRetryMode) {
+                    clearCart();
+                }
 
                 // 5. Navigate to success page
                 navigate('/order-success', {
                     state: {
                         orderId: paymentInfo.orderIds[0],
-                        orderNumbers: verifyResult.orderNumbers,
-                        totalAmount: paymentInfo.totalAmount,
+                        orderNumbers: verifyResult?.data?.orderNumbers || [retryState.existingOrderNumber],
+                        totalAmount: isRetryMode ? paymentInfo.totalAmount : paymentInfo.totalAmount / 100, // paymentInfo.totalAmount is paise for new, rupees for retry... normalized below
+                        // actually createsOrderForPayment returns PAISE. retry logic sets RUPEES.
+                        // For success page display, we generally want Rupees. 
+                        // Let's normalize data passed to success.
+
                         paymentMethod: 'online',
                         paymentId: paymentResponse.razorpay_payment_id
                     }
@@ -290,23 +361,42 @@ function PaymentDetailsPage() {
                                 <h2>Order Items ({items.length})</h2>
                             </div>
                             <div className="order-items">
-                                {items.map((item) => (
-                                    <div key={item._id} className="order-item">
-                                        <img
-                                            src={item.images?.[0] || '/placeholder-product.png'}
-                                            alt={item.name}
-                                            className="item-image"
-                                        />
-                                        <div className="item-details">
-                                            <h3 className="item-name">{item.name}</h3>
-                                            <p className="item-quantity">Quantity: {item.quantity}</p>
+                                {isRetryMode && retryState.retryItems ? (
+                                    retryState.retryItems.map((item) => (
+                                        <div key={item._id} className="order-item">
+                                            <img
+                                                src={item.images?.[0] || '/placeholder-product.png'}
+                                                alt={item.name}
+                                                className="item-image"
+                                            />
+                                            <div className="item-details">
+                                                <h3 className="item-name">{item.name}</h3>
+                                                <p className="item-quantity">Quantity: {item.quantity}</p>
+                                            </div>
+                                            <div className="item-pricing">
+                                                <p className="item-price">₹{item.price.toLocaleString('en-IN')}</p>
+                                                <p className="item-total">₹{(item.price * item.quantity).toLocaleString('en-IN')}</p>
+                                            </div>
                                         </div>
-                                        <div className="item-pricing">
-                                            <p className="item-price">₹{item.price.toLocaleString('en-IN')}</p>
-                                            <p className="item-total">₹{(item.price * item.quantity).toLocaleString('en-IN')}</p>
+                                    ))
+                                ) : (
+                                    items.map((item) => (
+                                        <div key={item._id} className="order-item">
+                                            <img
+                                                src={item.images?.[0] || '/placeholder-product.png'}
+                                                alt={item.name}
+                                                className="item-image"
+                                            />
+                                            <div className="item-details">
+                                                <h3 className="item-name">{item.name}</h3>
+                                                <p className="item-quantity">Quantity: {item.quantity}</p>
+                                            </div>
+                                            <div className="item-pricing">
+                                                <p className="item-price">₹{item.price.toLocaleString('en-IN')}</p>
+                                                <p className="item-total">₹{(item.price * item.quantity).toLocaleString('en-IN')}</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )))}
                             </div>
                         </div>
 
@@ -360,7 +450,7 @@ function PaymentDetailsPage() {
 
                             <div className="price-breakdown">
                                 <div className="price-row">
-                                    <span>Subtotal ({items.length} items)</span>
+                                    <span>Subtotal ({isRetryMode ? retryState.retryItems?.length : items.length} items)</span>
                                     <span>₹{pricing.subtotal.toLocaleString('en-IN')}</span>
                                 </div>
                                 <div className="price-row">
@@ -400,7 +490,7 @@ function PaymentDetailsPage() {
                                 onClick={handlePlaceOrder}
                                 disabled={orderLoading}
                             >
-                                {orderLoading ? 'Placing Order...' : 'Place Order'}
+                                {orderLoading ? 'Processing...' : (isRetryMode ? 'Retry Payment' : 'Place Order')}
                             </Button>
 
                             <p className="terms-text">
