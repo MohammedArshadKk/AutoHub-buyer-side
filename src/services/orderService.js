@@ -33,6 +33,20 @@ const orderService = {
         }
     },
 
+    // Preview Order Costs
+    previewOrder: async (orderData) => {
+        try {
+            const data = await fetchWithCredentials(`${API_URL}/orders/preview`, {
+                method: 'POST',
+                body: JSON.stringify(orderData),
+            });
+            return data.data;
+        } catch (error) {
+            console.error('Order preview failed:', error);
+            throw error;
+        }
+    },
+
     // Initiate payment for order
     initiatePayment: async (orderId) => {
         try {

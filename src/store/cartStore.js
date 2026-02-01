@@ -231,6 +231,23 @@ const useCartStore = create(
                 }
             },
 
+            // ============ AUTH HELPERS ============
+
+            /**
+             * Reset cart state on logout
+             */
+            logout: () => {
+                console.log('🛒 [CART] Resetting cart on logout');
+                set({
+                    items: [],
+                    lastSynced: null,
+                    error: null,
+                    isLoading: false
+                });
+                guestStorageService.clearGuestCart();
+            },
+
+
             // ============ BACKEND SYNC (Authenticated Only) ============
 
             /**
@@ -296,6 +313,14 @@ const useCartStore = create(
 
                 if (!isAuth) {
                     console.warn('Cannot sync: User not authenticated');
+                    return;
+                }
+
+                // If already synced, just fetch fresh cart to ensure consistency
+                // This prevents the "doubling" bug where hydrated items are pushed again on refresh
+                if (get().lastSynced) {
+                    console.log('🛒 [SYNC] Cart already synced previously. Fetching fresh state...');
+                    await get().fetchCart();
                     return;
                 }
 

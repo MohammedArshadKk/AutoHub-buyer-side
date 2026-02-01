@@ -9,7 +9,7 @@ import useCartStore, { setCartAuthChecker } from '../../store/cartStore';
  */
 function AuthProvider({ children }) {
     const { user, isAuthenticated, loading } = useAuth();
-    const { syncGuestCartToBackend } = useCartStore();
+    const { syncGuestCartToBackend, logout } = useCartStore();
     const prevUserRef = useRef(null);
 
     // Set auth checker for cart store
@@ -28,6 +28,11 @@ function AuthProvider({ children }) {
             syncGuestCartToBackend().catch((error) => {
                 console.debug('Cart sync handled:', error?.message);
             });
+        }
+
+        // User just logged out
+        if (prevUser && !user) {
+            logout();
         }
 
         // Update ref for next comparison

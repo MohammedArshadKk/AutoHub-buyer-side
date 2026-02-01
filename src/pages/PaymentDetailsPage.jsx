@@ -5,6 +5,7 @@ import useCartStore from '../store/cartStore';
 import addressService from '../services/addressService';
 import orderService from '../services/orderService';
 import paymentService from '../services/paymentService';
+import { configService } from '../services/configService';
 import Button from '../components/common/Button';
 import './PaymentDetailsPage.css';
 
@@ -12,11 +13,13 @@ function PaymentDetailsPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { items, getTotalPrice, clearCart } = useCartStore();
-
+    const [config, setConfig] = useState(null);
     const [selectedAddress, setSelectedAddress] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('cod');
     const [loading, setLoading] = useState(true);
     const [orderLoading, setOrderLoading] = useState(false);
+    const [previewData, setPreviewData] = useState(null);
+    const [previewLoading, setPreviewLoading] = useState(false);
 
     // Retry Mode detection
     const isRetryMode = !!location.state?.existingOrderId;
@@ -81,28 +84,78 @@ function PaymentDetailsPage() {
         }
     };
 
-    // Calculate pricing
-    const calculatePricing = () => {
-        if (isRetryMode && retryState.retryPricing) {
-            return retryState.retryPricing;
-        }
-
-        const subtotal = getTotalPrice();
-        const shippingCharge = subtotal >= 1000 ? 0 : 50;
-        const handlingCharge = 20;
-        const tax = 0; // Can add GST calculation if needed
-        const grandTotal = subtotal + shippingCharge + handlingCharge + tax;
-
-        return {
-            subtotal,
-            shippingCharge,
-            handlingCharge,
-            tax,
-            grandTotal
+    // Fetch System Config
+    useEffect(() => {
+        const loadConfig = async () => {
+            try {
+                const sysConfig = await configService.getSystemConfig();
+                setConfig(sysConfig);
+                // If COD disabled, switch to online
+                if (sysConfig && !sysConfig.codEnabled) {
+                    setPaymentMethod('online');
+                }
+            } catch (error) {
+                console.error("Failed to load config", error);
+            }
         };
-    };
+        loadConfig();
+    }, []);
 
-    const pricing = calculatePricing();
+    // Calculate Pricing / Preview Order
+    useEffect(() => {
+        const fetchPreview = async () => {
+            if (!selectedAddress || (items.length === 0 && !isRetryMode)) return;
+
+            // If retry mode, use fixed pricing if available, OR preview if we want dynamic shipping re-calc?
+            // Usually retry expects same pricing. 
+            if (isRetryMode && retryState.retryPricing) {
+                return;
+            }
+
+            try {
+                setPreviewLoading(true);
+                const orderItems = (isRetryMode ? retryState.retryItems : items).map(item => ({
+                    _id: item._id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity
+                }));
+
+                const preview = await orderService.previewOrder({
+                    items: orderItems,
+                    shippingAddress: {
+                        latitude: selectedAddress.latitude,
+                        longitude: selectedAddress.longitude
+                    }
+                });
+
+                setPreviewData(preview);
+            } catch (error) {
+                console.error("Preview failed", error);
+            } finally {
+                setPreviewLoading(false);
+            }
+        };
+
+        fetchPreview();
+    }, [selectedAddress, items, isRetryMode]);
+
+    // Derived Pricing
+    const displayPricing = isRetryMode && retryState.retryPricing ? retryState.retryPricing : (previewData ? {
+        subtotal: previewData.subtotal,
+        shippingCharge: previewData.shipping,
+        handlingCharge: config?.shipping?.handlingCharge || 0,
+        tax: 0,
+        grandTotal: previewData.total
+    } : {
+        subtotal: isRetryMode ? 0 : getTotalPrice(),
+        shippingCharge: 0,
+        handlingCharge: 0,
+        tax: 0,
+        grandTotal: 0
+    });
+
+
 
     const handlePlaceOrder = async () => {
         setOrderLoading(true);
@@ -125,14 +178,16 @@ function PaymentDetailsPage() {
                     city: selectedAddress.city,
                     state: selectedAddress.state,
                     zipCode: selectedAddress.zipCode,
-                    country: selectedAddress.country
+                    country: selectedAddress.country,
+                    latitude: selectedAddress.latitude,
+                    longitude: selectedAddress.longitude
                 },
                 pricing: {
-                    subtotal: pricing.subtotal,
-                    shippingCharge: pricing.shippingCharge,
-                    handlingCharge: pricing.handlingCharge,
-                    tax: pricing.tax,
-                    totalAmount: pricing.grandTotal
+                    subtotal: displayPricing.subtotal,
+                    shippingCharge: displayPricing.shippingCharge,
+                    handlingCharge: displayPricing.handlingCharge,
+                    tax: displayPricing.tax,
+                    totalAmount: displayPricing.grandTotal
                 }
             };
 
@@ -162,7 +217,7 @@ function PaymentDetailsPage() {
                     state: {
                         orderId: firstOrder._id,
                         orderNumber: firstOrder.orderNumber,
-                        totalAmount: pricing.grandTotal,
+                        totalAmount: displayPricing.grandTotal,
                         orders: response.orders,
                         isSplitOrder: response.isSplitOrder,
                         paymentMethod: 'cod'
@@ -200,7 +255,7 @@ function PaymentDetailsPage() {
                     // But if retryMode, we have pricing.grandTotal in RUPEES.
                     // Need to ensure consistency.
                     // Let's Convert URL state pricing (Rupees) -> Paise for Razorpay
-                    amount: isRetryMode ? Math.round(paymentInfo.totalAmount * 100) : paymentInfo.totalAmount,
+                    amount: Math.round(paymentInfo.totalAmount * 100),
 
                     currency: 'INR',
                     name: 'Auto Hub',
@@ -407,22 +462,24 @@ function PaymentDetailsPage() {
                                 <h2>Payment Method</h2>
                             </div>
                             <div className="payment-methods">
-                                <label className="payment-option">
-                                    <input
-                                        type="radio"
-                                        name="payment"
-                                        value="cod"
-                                        checked={paymentMethod === 'cod'}
-                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                    />
-                                    <div className="payment-option-content">
-                                        <Truck size={20} />
-                                        <div>
-                                            <strong>Cash on Delivery</strong>
-                                            <p>Pay when you receive the order</p>
+                                {config?.codEnabled && (
+                                    <label className="payment-option">
+                                        <input
+                                            type="radio"
+                                            name="payment"
+                                            value="cod"
+                                            checked={paymentMethod === 'cod'}
+                                            onChange={(e) => setPaymentMethod(e.target.value)}
+                                        />
+                                        <div className="payment-option-content">
+                                            <Truck size={20} />
+                                            <div>
+                                                <strong>Cash on Delivery</strong>
+                                                <p>Pay when you receive the order</p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </label>
+                                    </label>
+                                )}
                                 <label className="payment-option">
                                     <input
                                         type="radio"
@@ -451,36 +508,42 @@ function PaymentDetailsPage() {
                             <div className="price-breakdown">
                                 <div className="price-row">
                                     <span>Subtotal ({isRetryMode ? retryState.retryItems?.length : items.length} items)</span>
-                                    <span>₹{pricing.subtotal.toLocaleString('en-IN')}</span>
+                                    <span>₹{displayPricing.subtotal.toLocaleString('en-IN')}</span>
                                 </div>
                                 <div className="price-row">
                                     <span>Shipping Charges</span>
-                                    {pricing.shippingCharge === 0 ? (
+                                    {previewLoading ? (
+                                        <span className="text-gray-400 text-sm">Calculating...</span>
+                                    ) : (displayPricing.shippingCharge === 0 ? (
                                         <span className="free-badge">FREE</span>
                                     ) : (
-                                        <span>₹{pricing.shippingCharge}</span>
-                                    )}
+                                        <span>₹{displayPricing.shippingCharge}</span>
+                                    ))}
                                 </div>
                                 <div className="price-row">
                                     <span>Handling Charges</span>
-                                    <span>₹{pricing.handlingCharge}</span>
+                                    <span>₹{displayPricing.handlingCharge}</span>
                                 </div>
-                                {pricing.tax > 0 && (
+                                {displayPricing.tax > 0 && (
                                     <div className="price-row">
                                         <span>Tax</span>
-                                        <span>₹{pricing.tax}</span>
+                                        <span>₹{displayPricing.tax}</span>
                                     </div>
                                 )}
                             </div>
 
                             <div className="price-total">
                                 <strong>Total Amount</strong>
-                                <strong>₹{pricing.grandTotal.toLocaleString('en-IN')}</strong>
+                                {previewLoading ? (
+                                    <div className="h-6 w-24 bg-gray-200 animate-pulse rounded"></div>
+                                ) : (
+                                    <strong>₹{displayPricing.grandTotal.toLocaleString('en-IN')}</strong>
+                                )}
                             </div>
 
-                            {pricing.subtotal >= 1000 && (
+                            {previewData && previewData.subtotal >= (config?.shipping?.freeShippingThreshold || 1000) && (
                                 <p className="savings-message">
-                                    You saved ₹50 on shipping!
+                                    You saved on shipping!
                                 </p>
                             )}
 
@@ -488,7 +551,7 @@ function PaymentDetailsPage() {
                                 variant="primary"
                                 fullWidth
                                 onClick={handlePlaceOrder}
-                                disabled={orderLoading}
+                                disabled={orderLoading || previewLoading || !config}
                             >
                                 {orderLoading ? 'Processing...' : (isRetryMode ? 'Retry Payment' : 'Place Order')}
                             </Button>

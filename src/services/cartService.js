@@ -152,21 +152,17 @@ const cartService = {
         }
 
         try {
-            // Add each guest item to backend cart
-            // Backend handles merging if item already exists
-            for (const item of guestItems) {
-                try {
-                    await cartService.addItem(item.id || item._id, item.quantity);
-                } catch (itemError) {
-                    // Log but continue - some items might fail (out of stock, deleted, etc.)
-                    console.warn(`Failed to sync item ${item.id}:`, itemError.message);
-                }
-            }
+            console.log(`🚀 [CART SYNC] Bulk syncing ${guestItems.length} guest items to backend...`);
 
-            // Fetch final merged cart
-            return await cartService.getCart();
+            const response = await fetchWithCredentials(`${CART_ENDPOINTS.base}/sync`, {
+                method: 'POST',
+                body: JSON.stringify({ items: guestItems }),
+            });
+
+            console.log('🚀 [CART SYNC] Success - backend response received');
+            return response.data.cart;
         } catch (error) {
-            console.error('Failed to sync guest cart:', error);
+            console.error('🚀 [CART SYNC] Bulk sync failed:', error);
             throw {
                 message: 'Failed to sync your cart. Please try again.',
                 status: error.status,

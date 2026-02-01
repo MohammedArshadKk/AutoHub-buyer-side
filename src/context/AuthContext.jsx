@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
+import useCartStore from '../store/cartStore';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
@@ -59,6 +60,9 @@ export const AuthProvider = ({ children }) => {
             console.log('🔐 [LOGOUT] Calling backend logout service...');
             await authService.logout();
             console.log('🔐 [LOGOUT] Backend logout successful');
+
+            // Clear cart state
+            useCartStore.getState().logout();
 
             setUser(null);
             console.log('🔐 [LOGOUT] User state cleared');

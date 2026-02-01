@@ -15,6 +15,7 @@ import {
     XCircle
 } from 'lucide-react';
 import orderService from '../services/orderService';
+import { configService } from '../services/configService';
 import Button from '../components/common/Button';
 import './OrderDetailPage.css';
 
@@ -28,10 +29,22 @@ const OrderDetailPage = () => {
     const [cancelLoading, setCancelLoading] = useState(false);
     const [syncLoading, setSyncLoading] = useState(false);
     const [downloadLoading, setDownloadLoading] = useState(false);
+    const [systemConfig, setSystemConfig] = useState(null);
+    const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
+        fetchSystemConfig();
     }, [orderId]);
+
+    const fetchSystemConfig = async () => {
+        try {
+            const config = await configService.getSystemConfig();
+            setSystemConfig(config);
+        } catch (error) {
+            console.error('Failed to fetch system config:', error);
+        }
+    };
 
     // Auto-sync payment status if pending
     useEffect(() => {
@@ -292,7 +305,11 @@ const OrderDetailPage = () => {
                                     <FileText size={18} />
                                     {downloadLoading ? 'Downloading...' : 'Download Invoice'}
                                 </Button>
-                                <Button variant="outline" className="full-width justify-start">
+                                <Button
+                                    variant="outline"
+                                    className="full-width justify-start"
+                                    onClick={() => setIsHelpModalOpen(true)}
+                                >
                                     <HelpCircle size={18} />
                                     Need Help?
                                 </Button>
@@ -327,6 +344,12 @@ const OrderDetailPage = () => {
                                     <span>Subtotal</span>
                                     <span>₹{order.subtotal?.toLocaleString('en-IN')}</span>
                                 </div>
+                                {order.handlingCharge > 0 && (
+                                    <div className="price-row">
+                                        <span>Handling Fee</span>
+                                        <span>₹{order.handlingCharge.toLocaleString('en-IN')}</span>
+                                    </div>
+                                )}
                                 <div className="price-row">
                                     <span>Shipping</span>
                                     <span>{order.shippingCharge ? `₹${order.shippingCharge}` : 'Free'}</span>
@@ -392,6 +415,69 @@ const OrderDetailPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Help Modal */}
+            {isHelpModalOpen && (
+                <div className="cancel-modal-overlay" onClick={() => setIsHelpModalOpen(false)}>
+                    <div className="cancel-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                    <HelpCircle size={24} />
+                                </div>
+                                <h2 className="mb-0">How can we help?</h2>
+                            </div>
+                            <p>Our support team is available to assist you with your order.</p>
+                        </div>
+
+                        <div className="space-y-4 my-6">
+                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-4">
+                                <div className="p-2 bg-white rounded-lg shadow-sm">
+                                    <Store size={20} className="text-gray-600" />
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 uppercase font-bold">Sold by</p>
+                                    <p className="font-semibold text-gray-800">{order.sellerDetails?.businessName || 'Auto Hub Seller'}</p>
+                                </div>
+                            </div>
+
+                            <a
+                                href={`mailto:${systemConfig?.supportEmail || 'support@autohub.com'}`}
+                                className="p-4 bg-white hover:bg-gray-50 transition-colors rounded-xl border border-gray-100 flex items-center justify-between group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                        <HelpCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 uppercase font-bold">Email Support</p>
+                                        <p className="font-semibold text-gray-800">{systemConfig?.supportEmail || 'support@autohub.com'}</p>
+                                    </div>
+                                </div>
+                                <ArrowLeft size={18} className="rotate-180 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                            </a>
+
+                            {systemConfig?.supportPhone && (
+                                <div className="p-4 bg-white rounded-xl border border-gray-100 flex items-center gap-4">
+                                    <div className="p-2 bg-green-50 text-green-600 rounded-lg">
+                                        <HelpCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-gray-500 uppercase font-bold">Call Support</p>
+                                        <p className="font-semibold text-gray-800">{systemConfig.supportPhone}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="modal-actions">
+                            <Button variant="primary" className="full-width" onClick={() => setIsHelpModalOpen(false)}>
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Cancel Confirmation Modal */}
             {isCancelModalOpen && (
