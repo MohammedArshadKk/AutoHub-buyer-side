@@ -88,10 +88,12 @@ const orderService = {
     },
 
     // Cancel order
-    cancelOrder: async (orderId) => {
+    // Cancel order
+    cancelOrder: async (orderId, reason) => {
         try {
             const data = await fetchWithCredentials(`${API_URL}/orders/${orderId}/cancel`, {
                 method: 'POST',
+                body: JSON.stringify({ reason }),
             });
             return data.data.order;
         } catch (error) {

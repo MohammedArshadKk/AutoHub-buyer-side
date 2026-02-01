@@ -10,7 +10,9 @@ import {
     FileText,
     HelpCircle,
     RotateCcw,
-    Store
+    Store,
+    AlertTriangle,
+    XCircle
 } from 'lucide-react';
 import orderService from '../services/orderService';
 import Button from '../components/common/Button';
@@ -21,6 +23,10 @@ const OrderDetailPage = () => {
     const navigate = useNavigate();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+    const [cancellationReason, setCancellationReason] = useState('');
+    const [cancelLoading, setCancelLoading] = useState(false);
+    const [syncLoading, setSyncLoading] = useState(false);
 
     useEffect(() => {
         fetchOrderDetails();
@@ -46,7 +52,6 @@ const OrderDetailPage = () => {
         }
     };
 
-    const [syncLoading, setSyncLoading] = useState(false);
     const handleSyncPayment = async (silent = false) => {
         if (!order?.razorpayOrderId) return;
         try {
@@ -63,6 +68,26 @@ const OrderDetailPage = () => {
             if (!silent) alert('Failed to synchronize payment. Please try again later.');
         } finally {
             if (!silent) setSyncLoading(false);
+        }
+    };
+
+    const handleCancelOrder = async () => {
+        if (!cancellationReason) {
+            alert('Please select a reason for cancellation');
+            return;
+        }
+
+        try {
+            setCancelLoading(true);
+            await orderService.cancelOrder(orderId, cancellationReason);
+            setIsCancelModalOpen(false);
+            fetchOrderDetails(); // Refresh to show cancelled status
+            alert('Order cancelled successfully.');
+        } catch (error) {
+            console.error('Cancellation failed:', error);
+            alert(error.message || 'Failed to cancel order');
+        } finally {
+            setCancelLoading(false);
         }
     };
 
@@ -83,17 +108,13 @@ const OrderDetailPage = () => {
         );
     }
 
-    // Dynamic Timeline using statusHistory
-    // Mapping internal statuses to display steps
+    // Timeline Configuration
     const timelineEvents = order.statusHistory || [];
-
-    // Helper to find date for a specific status
     const getDateForStatus = (status) => {
         const event = timelineEvents.find(e => e.status === status);
         return event ? event.timestamp : null;
     };
 
-    // Define standard flow steps
     const steps = [
         { id: 'pending', label: 'Order Placed', icon: Box, date: getDateForStatus('pending') || order.orderedAt },
         { id: 'processing', label: 'Processing', icon: Package, date: getDateForStatus('processing') },
@@ -104,7 +125,7 @@ const OrderDetailPage = () => {
     const getCurrentStepIndex = () => {
         const status = order.orderStatus.toLowerCase();
         if (status === 'delivered') return 4;
-        if (status === 'out_for_delivery') return 3; // Highlight shipped step fully or maybe add a step? For now 3.5 ish but let's say 3
+        if (status === 'out_for_delivery') return 3;
         if (status === 'shipped') return 3;
         if (status === 'processing') return 2;
         if (status === 'confirmed') return 2;
@@ -112,6 +133,8 @@ const OrderDetailPage = () => {
     };
 
     const currentStep = getCurrentStepIndex();
+    const isCancelled = order.orderStatus === 'cancelled';
+    const canCancel = ['pending', 'confirmed', 'processing', 'payment_pending'].includes(order.orderStatus);
 
     return (
         <div className="order-detail-page">
@@ -161,55 +184,68 @@ const OrderDetailPage = () => {
                 <div className="od-content-grid">
                     {/* Left Column: Timeline & Address */}
                     <div className="od-main">
-                        {/* Timeline Card */}
+                        {/* Status Card */}
                         <div className="od-card">
-                            <h2 className="od-section-title">Tracking Status</h2>
-                            <div className="timeline-wrapper">
-                                <div className="timeline-track">
-                                    <div
-                                        className="timeline-progress"
-                                        style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
-                                    ></div>
-                                </div>
-                                <div className="timeline-steps">
-                                    {steps.map((step, index) => {
-                                        const isActive = index < currentStep;
-                                        // Specific check for Cancelled state to show red? 
-                                        // For now keeping simple green progress
-
-                                        const Icon = step.icon;
-
-                                        return (
-                                            <div key={step.id} className={`timeline-step ${isActive ? 'active' : ''}`}>
-                                                <div className="step-icon">
-                                                    <Icon size={18} />
-                                                </div>
-                                                <div className="step-info">
-                                                    <span className="step-label">{step.label}</span>
-                                                    {step.date && isActive && (
-                                                        <span className="step-date">
-                                                            {new Date(step.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="od-section-title mb-0">Order Status</h2>
+                                {isCancelled && (
+                                    <span className="px-3 py-1 bg-red-100 text-red-600 rounded-full text-sm font-bold flex items-center gap-2">
+                                        <XCircle size={16} /> Cancelled
+                                    </span>
+                                )}
                             </div>
 
-                            {/* Detailed Status History Log */}
-                            <div className="status-history-log mt-6 pt-4 border-t border-gray-100">
-                                <h3 className="text-sm font-semibold mb-3">Activity Log</h3>
-                                <div className="space-y-3">
+                            {!isCancelled ? (
+                                <div className="timeline-wrapper">
+                                    <div className="timeline-track">
+                                        <div
+                                            className="timeline-progress"
+                                            style={{ width: `${((currentStep - 1) / 3) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                    <div className="timeline-steps">
+                                        {steps.map((step, index) => {
+                                            const isActive = index < currentStep;
+                                            const Icon = step.icon;
+                                            return (
+                                                <div key={step.id} className={`timeline-step ${isActive ? 'active' : ''}`}>
+                                                    <div className="step-icon">
+                                                        <Icon size={18} />
+                                                    </div>
+                                                    <div className="step-info">
+                                                        <span className="step-label">{step.label}</span>
+                                                        {step.date && isActive && (
+                                                            <span className="step-date">
+                                                                {new Date(step.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-800">
+                                    <p className="font-medium">This order was cancelled on {new Date(order.cancelledAt).toLocaleDateString()}.</p>
+                                    <p className="text-sm mt-1">Reason: {order.cancellationReason}</p>
+                                </div>
+                            )}
+
+                            {/* Activity Log */}
+                            <div className="status-history-log mt-8 pt-4 border-t border-gray-100">
+                                <h3 className="text-sm font-semibold mb-3 text-gray-500 uppercase tracking-wide">Activity Log</h3>
+                                <div className="space-y-4">
                                     {order.statusHistory?.slice().reverse().map((event, idx) => (
-                                        <div key={idx} className="flex gap-3 text-sm">
-                                            <div className="text-gray-500 min-w-[120px]">
+                                        <div key={idx} className="flex gap-4 text-sm">
+                                            <div className="text-gray-400 font-mono text-xs min-w-[120px] pt-1">
                                                 {new Date(event.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                             </div>
                                             <div>
-                                                <span className="font-medium capitalize text-gray-800">{event.status.replace(/_/g, ' ')}</span>
-                                                {event.note && <span className="text-gray-500 block text-xs">"{event.note}"</span>}
+                                                <span className={`font-medium capitalize ${event.status === 'cancelled' ? 'text-red-600' : 'text-gray-800'}`}>
+                                                    {event.status.replace(/_/g, ' ')}
+                                                </span>
+                                                {event.note && <p className="text-gray-500 text-xs mt-0.5">"{event.note}"</p>}
                                             </div>
                                         </div>
                                     ))}
@@ -277,41 +313,34 @@ const OrderDetailPage = () => {
                                 </div>
                             </div>
 
-                            {order.orderStatus === 'payment_pending' ? (
-                                <div className="od-actions-footer space-y-2">
-                                    <Button
-                                        variant="primary"
-                                        className="full-width"
-                                        onClick={handleSyncPayment}
-                                        disabled={syncLoading}
-                                    >
-                                        {syncLoading ? 'Checking...' : 'Verify Payment Status'}
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        className="full-width"
-                                        onClick={() => navigate('/payment', { state: { addressId: order.shippingAddress?._id || 'retry' } })}
-                                    >
-                                        Retry Payment
-                                    </Button>
-                                </div>
-                            ) : order.orderStatus === 'payment_failed' ? (
-                                <div className="od-actions-footer">
+                            <div className="od-actions-footer space-y-3">
+                                {order.orderStatus === 'payment_pending' ? (
+                                    <>
+                                        <Button
+                                            variant="primary"
+                                            className="full-width"
+                                            onClick={handleSyncPayment}
+                                            disabled={syncLoading}
+                                        >
+                                            {syncLoading ? 'Checking...' : 'Verify Payment Status'}
+                                        </Button>
+                                    </>
+                                ) : order.orderStatus === 'payment_failed' ? (
                                     <Button
                                         variant="primary"
                                         className="full-width"
                                         onClick={() => navigate('/payment', {
                                             state: {
                                                 addressId: 'retry',
-                                                existingOrderId: order._id, // Signal retry mode
+                                                existingOrderId: order._id,
                                                 existingRazorpayOrderId: order.razorpayOrderId,
                                                 existingOrderNumber: order.orderNumber,
                                                 retryItems: order.items,
                                                 retryAddress: order.shippingAddress,
                                                 retryPricing: {
-                                                    subtotal: order.subtotal || order.totalAmount, // Fallback if subtotal missing
+                                                    subtotal: order.subtotal || order.totalAmount,
                                                     shippingCharge: order.shippingCharge || 0,
-                                                    handlingCharge: 0, // Already part of total likely
+                                                    handlingCharge: 0,
                                                     tax: 0,
                                                     grandTotal: order.totalAmount
                                                 }
@@ -320,25 +349,68 @@ const OrderDetailPage = () => {
                                     >
                                         Retry Payment
                                     </Button>
-                                </div>
-                            ) : order.orderStatus === 'pending' || order.orderStatus === 'confirmed' ? (
-                                <div className="od-actions-footer">
-                                    <Button variant="danger" className="full-width" onClick={() => {/* Cancel logic */ }}>
+                                ) : canCancel ? (
+                                    <Button
+                                        variant="secondary"
+                                        className="full-width text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                                        onClick={() => setIsCancelModalOpen(true)}
+                                    >
                                         Cancel Order
                                     </Button>
-                                </div>
-                            ) : (
-                                <div className="od-actions-footer">
+                                ) : !isCancelled && (
                                     <Button variant="secondary" className="full-width">
                                         <RotateCcw size={16} />
                                         Return Items
                                     </Button>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Cancel Confirmation Modal */}
+            {isCancelModalOpen && (
+                <div className="cancel-modal-overlay" onClick={() => setIsCancelModalOpen(false)}>
+                    <div className="cancel-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Cancel Order</h2>
+                            <p>Please select a reason for cancellation</p>
+                        </div>
+
+                        <div className="reason-options">
+                            {['Ordered by mistake', 'Found cheaper price', 'Shipping time is too long', 'Changed my mind', 'Other'].map(reason => (
+                                <label
+                                    key={reason}
+                                    className={`reason-option ${cancellationReason === reason ? 'selected' : ''}`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="cancelReason"
+                                        value={reason}
+                                        checked={cancellationReason === reason}
+                                        onChange={(e) => setCancellationReason(e.target.value)}
+                                    />
+                                    {reason}
+                                </label>
+                            ))}
+                        </div>
+
+                        <div className="modal-actions">
+                            <Button variant="secondary" onClick={() => setIsCancelModalOpen(false)}>
+                                Keep Order
+                            </Button>
+                            <Button
+                                variant="danger"
+                                onClick={handleCancelOrder}
+                                disabled={cancelLoading}
+                            >
+                                {cancelLoading ? 'Cancelling...' : 'Confirm Cancellation'}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
